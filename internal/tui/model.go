@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/user"
 
+	"yt-downloader/internal/config"
 	"yt-downloader/internal/downloader"
 
 	tea "charm.land/bubbletea/v2"
@@ -44,6 +45,7 @@ type sizeFetchedMsg struct {
 }
 
 type Model struct {
+	Config     config.Config
 	ChoiceType string
 	ChoiceMode string
 
@@ -88,13 +90,14 @@ type Model struct {
 	ErrorMessage string
 }
 
-func InitialModel() *Model {
+func InitialModel(cfg config.Config) *Model {
 	currentUser, err := user.Current()
 	if err != nil {
 		log.Fatal("Could not get current user")
 	}
 	return &Model{
-		ChoiceType:      "Audio",
+		Config:          cfg,
+		ChoiceType:      cfg.DefaultDownloadType,
 		ChoiceMode:      "Single",
 		Searching:       true,
 		Blink:           true,
@@ -103,9 +106,9 @@ func InitialModel() *Model {
 		SizeCache:       make(map[string]string),
 		SizeInFlight:    make(map[string]bool),
 		User:            currentUser.HomeDir,
-		MaxWorkers:      3,
+		MaxWorkers:      cfg.MaxWorkers,
 		DownloadState:   StatusIdle,
-		fontShrinkDelta: 3.0,
+		fontShrinkDelta: cfg.FontShrinkDelta,
 	}
 }
 

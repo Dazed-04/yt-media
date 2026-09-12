@@ -19,6 +19,7 @@ import (
 type (
 	blinkMsg       struct{}
 	spinnerTickMsg struct{}
+	errorClearMsg  struct{}
 )
 
 type previewRenderedMsg struct {
@@ -101,7 +102,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return blinkMsg{}
 			})
 
-		case "t":
+		case "tab":
 			if m.ChoiceType == "Audio" {
 				m.ChoiceType = "Video"
 			} else {
@@ -113,6 +114,24 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, sizeCmd
 
+		case "r":
+			hadFailures := false
+			for i := range m.Jobs {
+				if m.Jobs[i].Status == StatusError {
+					m.Jobs[i].Status = StatusPending
+					m.Jobs[i].Err = nil
+					m.Jobs[i].Progress = 0
+					hadFailures = true
+				}
+			}
+			if !hadFailures {
+				return m, nil
+			}
+			if m.DownloadState == StatusDone {
+				m.DownloadState = StatusDownloading
+			}
+			return m, m.startWorkerQueue()
+
 		case "esc":
 			if m.DownloadState == StatusDone {
 				m.DownloadState = StatusIdle
@@ -121,13 +140,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.resetInFlight()
 			m.SearchQuery = ""
 			m.FilteredList = m.MusicList
+			m.ErrorMessage = ""
 			m.Cursor = 0
 			m.ListOffset = 0
 			m.Selected = make(map[int]string)
 			m.purgePreviewCache()
 			return m, m.showCachedPreview()
 
-		case "up", "k", "shift+tab":
+		case "up", "k":
 			if len(m.FilteredList) == 0 {
 				return m, nil
 			}
@@ -141,7 +161,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			v := m.FilteredList[m.Cursor]
 			return m, tea.Batch(m.showCachedPreview(), m.priorityFetchCmd(v), m.fetchSizeCmd(v, m.ChoiceType))
 
-		case "down", "j", "tab":
+		case "down", "j":
 			if len(m.FilteredList) == 0 {
 				return m, nil
 			}
@@ -192,6 +212,27 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.Selected = make(map[int]string)
 			return m, m.checkLibraryManual(toCheck)
 		}
+
+	case tea.PasteMsg:
+		if !m.Searching {
+			return m, nil
+		}
+		m.SearchQuery += msg.Content
+
+		m.FilteredList = m.MusicList
+		if m.SearchQuery != "" {
+			query := strings.ToLower(m.SearchQuery)
+			var filtered []downloader.Video
+			for _, item := range m.MusicList {
+				if strings.Contains(strings.ToLower(item.Title), query) || strings.Contains(strings.ToLower(item.Artist), query) {
+					filtered = append(filtered, item)
+				}
+			}
+			m.FilteredList = filtered
+		}
+		m.Cursor = 0
+		m.ListOffset = 0
+		return m, nil
 
 	case blinkMsg:
 		if m.Searching {
@@ -341,6 +382,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		if allDone {
 			m.DownloadState = StatusDone
+			if m.Config.NotifyOnBatch && m.TotalItems >= m.Config.NotifyMinItems {
+				total := m.TotalItems
+				return m, func() tea.Msg {
+					notifyBatchComplete(total)
+					return nil
+				}
+			}
 			return m, nil
 		}
 		return m, m.startWorkerQueue()
@@ -349,6 +397,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		log.Printf("Caught error in TUI: %v", msg)
 		m.IsFetching = false
 		m.resetInFlight()
+		m.ErrorMessage = msg.Error()
+		return m, tea.Tick(time.Second*5, func(t time.Time) tea.Msg { return errorClearMsg{} })
+
+	case errorClearMsg:
+		m.ErrorMessage = ""
 		return m, nil
 
 	case previewRenderedMsg:

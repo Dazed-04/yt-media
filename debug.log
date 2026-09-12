@@ -608,3 +608,55 @@ debug 2026/09/12 22:02:11 [SYS] Initializing TUI Session
 debug 2026/09/12 22:04:05 [SYS] Initializing TUI Session
 debug 2026/09/12 22:07:20 [SYS] Initializing TUI Session
 debug 2026/09/12 22:10:51 [SYS] Initializing TUI Session
+debug 2026/09/12 23:09:04 [SYS] Initializing TUI Session
+debug 2026/09/12 23:14:05 [SYS] Initializing TUI Session
+debug 2026/09/12 23:17:22 [SYS] Initializing TUI Session
+debug 2026/09/12 23:20:31 [SYS] Initializing TUI Session
+WARNING: Long argument string detected. Use -- to separate parameters and URLs, like this:
+yt-dlp -f bestaudio/best -o '/home/Dazed/Music/single/%(title)s.%(ext)s' --extract-audio --audio-format mp3 --embed-metadata --embed-thumbnail --newline --download-archive Co0tTeuUVhU -- --no-colors
+WARNING: Long argument string detected. Use -- to separate parameters and URLs, like this:
+yt-dlp -f bestaudio/best -o '/home/Dazed/Music/single/%(title)s.%(ext)s' --extract-audio --audio-format mp3 --embed-metadata --embed-thumbnail --newline --download-archive MxEjnYdfLXU -- --no-colors
+
+Usage: yt-dlp [OPTIONS] URL [URL...]
+
+yt-dlp: error: You must provide at least one URL.
+Type yt-dlp --help to see a list of all options.
+WARNING: Long argument string detected. Use -- to separate parameters and URLs, like this:
+yt-dlp -f bestaudio/best -o '/home/Dazed/Music/single/%(title)s.%(ext)s' --extract-audio --audio-format mp3 --embed-metadata --embed-thumbnail --newline --download-archive HBMy-y2wb4I -- --no-colors
+
+Usage: yt-dlp [OPTIONS] URL [URL...]
+
+yt-dlp: error: You must provide at least one URL.
+Type yt-dlp --help to see a list of all options.
+
+Usage: yt-dlp [OPTIONS] URL [URL...]
+
+yt-dlp: error: You must provide at least one URL.
+Type yt-dlp --help to see a list of all options.
+debug 2026/09/12 23:21:52 Download job 0 failed: exit status 2
+debug 2026/09/12 23:21:52 Download job 2 failed: exit status 2
+debug 2026/09/12 23:21:52 Download job 1 failed: exit status 2
+WARNING: Long argument string detected. Use -- to separate parameters and URLs, like this:
+yt-dlp -f bestaudio/best -o '/home/Dazed/Music/single/%(title)s.%(ext)s' --extract-audio --audio-format mp3 --embed-metadata --embed-thumbnail --newline --download-archive 9sJZOGxRxwM -- --no-colors
+
+Usage: yt-dlp [OPTIONS] URL [URL...]
+
+yt-dlp: error: You must provide at least one URL.
+Type yt-dlp --help to see a list of all options.
+WARNING: Long argument string detected. Use -- to separate parameters and URLs, like this:
+yt-dlp -f bestaudio/best -o '/home/Dazed/Music/single/%(title)s.%(ext)s' --extract-audio --audio-format mp3 --embed-metadata --embed-thumbnail --newline --download-archive 6CHs4x2uqcQ -- --no-colors
+
+Usage: yt-dlp [OPTIONS] URL [URL...]
+
+yt-dlp: error: You must provide at least one URL.
+Type yt-dlp --help to see a list of all options.
+WARNING: Long argument string detected. Use -- to separate parameters and URLs, like this:
+yt-dlp -f bestaudio/best -o '/home/Dazed/Music/single/%(title)s.%(ext)s' --extract-audio --audio-format mp3 --embed-metadata --embed-thumbnail --newline --download-archive BBAtAM7vtgc -- --no-colors
+
+Usage: yt-dlp [OPTIONS] URL [URL...]
+
+yt-dlp: error: You must provide at least one URL.
+Type yt-dlp --help to see a list of all options.
+debug 2026/09/12 23:22:20 Download job 3 failed: exit status 2
+debug 2026/09/12 23:22:20 Download job 4 failed: exit status 2
+debug 2026/09/12 23:22:20 Download job 5 failed: exit status 2

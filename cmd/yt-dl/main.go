@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"yt-downloader/internal/config"
 	"yt-downloader/internal/tui"
 
 	tea "charm.land/bubbletea/v2"
@@ -17,7 +18,8 @@ func main() {
 	}
 	defer f.Close()
 
-	p := tea.NewProgram(tui.InitialModel())
+	cfg := config.Load()
+	p := tea.NewProgram(tui.InitialModel(cfg))
 
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Application error: %v\n", err)

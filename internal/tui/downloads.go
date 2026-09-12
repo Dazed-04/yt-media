@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"yt-downloader/internal/config"
 	"yt-downloader/internal/downloader"
 
 	tea "charm.land/bubbletea/v2"
@@ -54,10 +55,27 @@ func (m *Model) startWorkerQueue() tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+var youtubeURLRe = regexp.MustCompile(`(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/shorts/)([\w-]{11})`)
+
+func extractYoutubeID(s string) (string, bool) {
+	m := youtubeURLRe.FindStringSubmatch(s)
+	if len(m) == 2 {
+		return m[1], true
+	}
+	return "", false
+}
+
 func (m *Model) doSearch() tea.Cmd {
 	return func() tea.Msg {
-		finalQuery := m.SearchQuery
-		results, err := downloader.SearchYoutube(finalQuery, 15)
+		query := strings.TrimSpace(m.SearchQuery)
+		if id, ok := extractYoutubeID(query); ok {
+			v, err := downloader.FetchSingle(id)
+			if err != nil {
+				return errorMsg(err)
+			}
+			return searchResultsMsg([]downloader.Video{v})
+		}
+		results, err := downloader.SearchYoutube(query, m.Config.SearchResultLimit)
 		if err != nil {
 			return errorMsg(err)
 		}
@@ -70,11 +88,20 @@ func (m *Model) downloadItem(jobIndex int) tea.Cmd {
 		req := m.Jobs[jobIndex].Req
 		v := req.Video
 
+		musicRoot := m.Config.MusicDir
+		if musicRoot == "" {
+			musicRoot = filepath.Join(m.User, "Music")
+		}
+		videoRoot := m.Config.VideoDir
+		if videoRoot == "" {
+			videoRoot = filepath.Join(m.User, "Videos")
+		}
+
 		var baseDir string
 		if m.ChoiceMode == "Single" {
-			baseDir = filepath.Join(m.User, "Music", "single")
+			baseDir = filepath.Join(musicRoot, "single")
 			if req.Type == "Video" {
-				baseDir = filepath.Join(m.User, "Videos", "single")
+				baseDir = filepath.Join(videoRoot, "single")
 			}
 		} else {
 			artist := sanitize(v.Artist)
@@ -86,9 +113,9 @@ func (m *Model) downloadItem(jobIndex int) tea.Cmd {
 				album = "Playlist"
 			}
 			dirName := fmt.Sprintf("%s - %s", artist, album)
-			baseDir = filepath.Join(m.User, "Music", dirName)
+			baseDir = filepath.Join(musicRoot, dirName)
 			if req.Type == "Video" {
-				baseDir = filepath.Join(m.User, "Videos", dirName)
+				baseDir = filepath.Join(videoRoot, dirName)
 			}
 		}
 
@@ -102,7 +129,7 @@ func (m *Model) downloadItem(jobIndex int) tea.Cmd {
 			args = append(args, "bestvideo+bestaudio/best", "-o", outputPath)
 		}
 
-		args = append(args, "--embed-metadata", "--embed-thumbnail", "--newline", "--no-colors", v.ID)
+		args = append(args, "--embed-metadata", "--embed-thumbnail", "--newline", "--no-colors", "--download-archive", v.ID)
 
 		cmd := exec.Command("yt-dlp", args...)
 		stdout, _ := cmd.StdoutPipe()
@@ -178,47 +205,40 @@ func sanitize(s string) string {
 	return strings.TrimSpace(s)
 }
 
-func libSanitize(s string) string {
-	s = strings.ToLower(s)
-	reg := regexp.MustCompile(`[^a-z0-9]+`)
-	s = reg.ReplaceAllString(s, "")
-	return strings.TrimSpace(s)
+func (m *Model) archivePath() string {
+	if m.Config.ArchiveFile != "" {
+		return m.Config.ArchiveFile
+	}
+	dir := filepath.Dir(config.Path())
+	return filepath.Join(dir, "archive.txt")
+}
+
+func loadArchiveIDs(path string) map[string]bool {
+	ids := make(map[string]bool)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ids
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if fields := strings.Fields(line); len(fields) == 2 {
+			ids[fields[1]] = true
+		}
+	}
+	return ids
 }
 
 func (m *Model) checkLibraryManual(items []DownloadReq) tea.Cmd {
 	return func() tea.Msg {
+		archived := loadArchiveIDs(m.archivePath())
 		var toDownload []DownloadReq
 		var skipped []string
-
-		basePath := filepath.Join(m.User, "Music")
-		_ = os.MkdirAll(basePath, 0o755)
-
 		for _, req := range items {
-			target := libSanitize(req.Video.Title)
-			found := false
-			filepath.WalkDir(basePath, func(path string, d os.DirEntry, err error) error {
-				if err != nil || found {
-					return nil
-				}
-				if d.IsDir() {
-					if d.Name() == "lyrics" {
-						return filepath.SkipDir
-					}
-					return nil
-				}
-				filename := libSanitize(strings.TrimSuffix(d.Name(), filepath.Ext(d.Name())))
-				if strings.Contains(filename, target) {
-					found = true
-				}
-				return nil
-			})
-			if found {
+			if archived[req.Video.ID] {
 				skipped = append(skipped, req.Video.Title)
 			} else {
 				toDownload = append(toDownload, req)
 			}
 		}
-
 		return checkLibraryMsg{ToDownload: toDownload, Skipped: skipped}
 	}
 }

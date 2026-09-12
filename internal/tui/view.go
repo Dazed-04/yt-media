@@ -193,13 +193,19 @@ func (m Model) View() tea.View {
 			fmt.Fprintf(&listBuilder, "%s  %s%s\n", bullet, modeLabel, lineStyle.Render(titleStr))
 		}
 
+		listContent := strings.TrimSuffix(listBuilder.String(), "\n")
+		listLines := strings.Split(listContent, "\n")
+		if len(listLines) < m.VisibleListH {
+			listContent += strings.Repeat("\n", m.VisibleListH-len(listLines))
+		}
+
 		listBox := lipgloss.NewStyle().
 			Width(listW).
 			Height(m.VisibleListH).
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("#313244")).
 			Padding(0, 1).
-			Render(strings.TrimSuffix(listBuilder.String(), "\n"))
+			Render(listContent)
 
 		bottomSection = lipgloss.NewStyle().
 			Margin(0, 2).
@@ -273,15 +279,21 @@ func (m Model) View() tea.View {
 	}
 
 	// --- 5. Footer (Hints) ---
-	hintStr := fmt.Sprintf("(esc: reset • /: search • t: default %s • space: select • enter: download)", m.ChoiceType)
+	hintStr := fmt.Sprintf("(esc: reset • /: search • tab: default %s • space: select • enter: download • r: retry failed)", m.ChoiceType)
 
-	// Single line gap specifically placed *between* the bottom boxes (or progress bar) and the hint line
+	footerContent := hintStr
+	footerColor := lipgloss.Color("#585B70")
+	if m.ErrorMessage != "" {
+		footerContent = " " + m.ErrorMessage
+		footerColor = lipgloss.Color("#F38BA8")
+	}
+
 	footer := lipgloss.NewStyle().
 		Width(m.Width).
 		Align(lipgloss.Center).
-		Foreground(lipgloss.Color("#585B70")).
+		Foreground(footerColor).
 		MarginTop(1).
-		Render(hintStr)
+		Render(footerContent)
 
 	// --- Assembly ---
 	var finalBlocks []string
