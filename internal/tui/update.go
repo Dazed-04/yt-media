@@ -151,13 +151,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(m.FilteredList) == 0 {
 				return m, nil
 			}
-			m.Cursor--
-			if m.Cursor < 0 {
-				m.Cursor = len(m.FilteredList) - 1
-				m.ListOffset = max(0, len(m.FilteredList)-m.VisibleListH)
-			} else if m.Cursor < m.ListOffset {
-				m.ListOffset = m.Cursor
-			}
+			m.moveCursor(-1)
 			v := m.FilteredList[m.Cursor]
 			return m, tea.Batch(m.showCachedPreview(), m.priorityFetchCmd(v), m.fetchSizeCmd(v, m.ChoiceType))
 
@@ -165,13 +159,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(m.FilteredList) == 0 {
 				return m, nil
 			}
-			m.Cursor++
-			if m.Cursor >= len(m.FilteredList) {
-				m.Cursor = 0
-				m.ListOffset = 0
-			} else if m.Cursor >= m.ListOffset+m.VisibleListH {
-				m.ListOffset = m.Cursor - m.VisibleListH + 1
-			}
+			m.moveCursor(1)
 			v := m.FilteredList[m.Cursor]
 			return m, tea.Batch(m.showCachedPreview(), m.priorityFetchCmd(v), m.fetchSizeCmd(v, m.ChoiceType))
 
@@ -184,13 +172,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.Selected[m.Cursor] = m.ChoiceType
 			}
-			m.Cursor++
-			if m.Cursor >= len(m.FilteredList) {
-				m.Cursor = 0
-				m.ListOffset = 0
-			} else if m.Cursor >= m.ListOffset+m.VisibleListH {
-				m.ListOffset = m.Cursor - m.VisibleListH + 1
-			}
+			m.moveCursor(1)
 			v := m.FilteredList[m.Cursor]
 			return m, tea.Batch(m.showCachedPreview(), m.priorityFetchCmd(v), m.fetchSizeCmd(v, m.ChoiceType))
 

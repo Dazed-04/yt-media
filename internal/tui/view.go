@@ -8,6 +8,22 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
+const maxNameLines = 4
+
+func wrapLines(value string, width, maxLines int) []string {
+	if width < 1 {
+		width = 1
+	}
+	rendered := lipgloss.NewStyle().Width(width).Render(value)
+	lines := strings.Split(rendered, "\n")
+	if len(lines) <= maxLines {
+		return lines
+	}
+	lines = lines[:maxLines]
+	lines[maxLines-1] = safeTruncate(lines[maxLines-1], width-1) + "..."
+	return lines
+}
+
 func safeTruncate(s string, maxLen int) string {
 	if maxLen <= 0 {
 		return ""
@@ -97,9 +113,28 @@ func (m Model) View() tea.View {
 			if valW < 2 {
 				valW = 2
 			}
+			value = safeTruncate(value, valW)
 			valBox := lipgloss.NewStyle().Width(valW).Align(lipgloss.Right).Foreground(lipgloss.Color("#A6ADC8")).Render(value)
 			return lipgloss.JoinHorizontal(lipgloss.Top, lblBox, valBox)
 		}
+
+		valW := infoW - 14
+		if valW < 2 {
+			valW = 2
+		}
+		nameLabel := lipgloss.NewStyle().Width(10).Align(lipgloss.Left).Foreground(lipgloss.Color("#89B4FA")).Bold(true).Render("Name:")
+		blankLabel := lipgloss.NewStyle().Width(10).Render("")
+
+		var nameRows []string
+		for i, ln := range wrapLines(current.Title, valW, maxNameLines) {
+			label := blankLabel
+			if i == 0 {
+				label = nameLabel
+			}
+			valBox := lipgloss.NewStyle().Width(valW).Align(lipgloss.Left).Foreground(lipgloss.Color("#A6ADC8")).Render(ln)
+			nameRows = append(nameRows, lipgloss.JoinHorizontal(lipgloss.Top, label, valBox))
+		}
+		nameBlock := strings.Join(nameRows, "\n")
 
 		selectedType := m.ChoiceType
 		if t, ok := m.Selected[m.Cursor]; ok {
@@ -116,7 +151,7 @@ func (m Model) View() tea.View {
 		durationStr := fmt.Sprintf("%v", current.Duration)
 
 		infoUI := lipgloss.JoinVertical(lipgloss.Left,
-			makeRow("Name:", current.Title),
+			nameBlock,
 			makeRow("Artist:", current.Artist),
 			makeRow("Channel:", current.Channel),
 			makeRow("Size:", sizeStr),
@@ -138,13 +173,14 @@ func (m Model) View() tea.View {
 			Render(infoUI)
 
 		var listBuilder strings.Builder
-		endIdx := m.ListOffset + m.VisibleListH
-		if endIdx > len(m.FilteredList) {
-			endIdx = len(m.FilteredList)
+		n := len(m.FilteredList)
+		visibleCount := m.VisibleListH
+		if visibleCount > n {
+			visibleCount = n
 		}
 
-		for i := m.ListOffset; i < endIdx; i++ {
-			// (Keep your existing list loop logic here...)
+		for row := 0; row < visibleCount; row++ {
+			i := (m.ListOffset + row) % n
 			video := m.FilteredList[i]
 			bullet := "○"
 			hasCustomBadge := false

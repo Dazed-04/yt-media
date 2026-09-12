@@ -660,3 +660,8 @@ Type yt-dlp --help to see a list of all options.
 debug 2026/09/12 23:22:20 Download job 3 failed: exit status 2
 debug 2026/09/12 23:22:20 Download job 4 failed: exit status 2
 debug 2026/09/12 23:22:20 Download job 5 failed: exit status 2
+debug 2026/09/12 23:30:12 [SYS] Initializing TUI Session
+debug 2026/09/12 23:43:30 [SYS] Initializing TUI Session
+debug 2026/09/12 23:44:37 [SYS] Initializing TUI Session
+debug 2026/09/12 23:45:45 [SYS] Initializing TUI Session
+debug 2026/09/12 23:45:50 [PREVIEW] render failed for Dst9gZkq1a8: invalid JPEG format: short Huffman data

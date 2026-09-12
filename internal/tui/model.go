@@ -120,6 +120,27 @@ func (m *Model) Init() tea.Cmd {
 	}
 }
 
+func (m *Model) moveCursor(delta int) {
+	n := len(m.FilteredList)
+	if n == 0 {
+		return
+	}
+	m.Cursor = ((m.Cursor+delta)%n + n) % n
+
+	visible := m.VisibleListH
+	if visible > n {
+		visible = n
+	}
+	visibleIndex := ((m.Cursor-m.ListOffset)%n + n) % n
+	if visibleIndex >= visible {
+		if delta > 0 {
+			m.ListOffset = (m.ListOffset + 1) % n
+		} else {
+			m.ListOffset = (m.ListOffset - 1 + n) % n
+		}
+	}
+}
+
 func (m *Model) previewImageDims() (cols, rows int) {
 	cols = m.Width - 8
 	if cols < 4 {
