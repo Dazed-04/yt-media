@@ -1,0 +1,304 @@
+debug 2026/09/11 22:24:02 [SYS] Initializing TUI Session
+debug 2026/09/11 22:24:32 [SYS] Initializing TUI Session
+debug 2026/09/11 22:25:48 [PREVIEW] skip fetch for OkqHNH22TEA: url="https://i.ytimg.com/vi/OkqHNH22TEA/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:25:49 [PREVIEW] skip fetch for jQGqtCalg9Y: url="https://i.ytimg.com/vi/jQGqtCalg9Y/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:25:50 [PREVIEW] skip fetch for Q3IdDymP11E: url="https://i.ytimg.com/vi/Q3IdDymP11E/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:25:51 [PREVIEW] skip fetch for fCeiUX59_FM: url="https://i.ytimg.com/vi/fCeiUX59_FM/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:25:52 [PREVIEW] skip fetch for YtEPefNmczU: url="https://i.ytimg.com/vi/YtEPefNmczU/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:25:52 [PREVIEW] skip fetch for YKMyO09Qo4s: url="https://i.ytimg.com/vi/YKMyO09Qo4s/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:25:52 [PREVIEW] skip fetch for 1kgPhwiaC-o: url="https://i.ytimg.com/vi/1kgPhwiaC-o/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:25:53 [PREVIEW] skip fetch for nK0mJ4ZuhVU: url="https://i.ytimg.com/vi/nK0mJ4ZuhVU/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:25:53 [PREVIEW] skip fetch for SIsHuBbo9mI: url="https://i.ytimg.com/vi/SIsHuBbo9mI/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:25:57 [PREVIEW] nK0mJ4ZuhVU already cached on disk
+debug 2026/09/11 22:25:57 [PREVIEW] 1kgPhwiaC-o already cached on disk
+debug 2026/09/11 22:25:57 [PREVIEW] YKMyO09Qo4s already cached on disk
+debug 2026/09/11 22:25:58 [PREVIEW] YtEPefNmczU already cached on disk
+debug 2026/09/11 22:25:58 [PREVIEW] fCeiUX59_FM already cached on disk
+debug 2026/09/11 22:25:58 [PREVIEW] Q3IdDymP11E already cached on disk
+debug 2026/09/11 22:25:58 [PREVIEW] jQGqtCalg9Y already cached on disk
+debug 2026/09/11 22:25:59 [PREVIEW] OkqHNH22TEA already cached on disk
+debug 2026/09/11 22:25:59 [PREVIEW] sWnlPAkE8M8 already cached on disk
+debug 2026/09/11 22:26:00 [PREVIEW] OkqHNH22TEA already cached on disk
+debug 2026/09/11 22:26:00 [PREVIEW] jQGqtCalg9Y already cached on disk
+debug 2026/09/11 22:26:00 [PREVIEW] Q3IdDymP11E already cached on disk
+debug 2026/09/11 22:26:00 [PREVIEW] fCeiUX59_FM already cached on disk
+debug 2026/09/11 22:26:01 [PREVIEW] YtEPefNmczU already cached on disk
+debug 2026/09/11 22:26:01 [PREVIEW] YKMyO09Qo4s already cached on disk
+debug 2026/09/11 22:26:01 [PREVIEW] 1kgPhwiaC-o already cached on disk
+debug 2026/09/11 22:26:01 [PREVIEW] nK0mJ4ZuhVU already cached on disk
+debug 2026/09/11 22:26:02 [PREVIEW] SIsHuBbo9mI already cached on disk
+debug 2026/09/11 22:27:05 [PREVIEW] nK0mJ4ZuhVU already cached on disk
+debug 2026/09/11 22:27:06 [PREVIEW] SIsHuBbo9mI already cached on disk
+debug 2026/09/11 22:31:50 [SYS] Initializing TUI Session
+debug 2026/09/11 22:32:30 [PREVIEW] skip fetch for RSvU4J01jM4: url="https://i.ytimg.com/vi/RSvU4J01jM4/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:32:30 [PREVIEW] skip fetch for HfWu4GKe1hc: url="https://i.ytimg.com/vi/HfWu4GKe1hc/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:32:31 [PREVIEW] skip fetch for A5mURRozXtg: url="https://i.ytimg.com/vi/A5mURRozXtg/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:32:33 [PREVIEW] skip fetch for 6FrxCRLvikY: url="https://i.ytimg.com/vi/6FrxCRLvikY/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:32:33 [PREVIEW] skip fetch for WpORsRstZCc: url="https://i.ytimg.com/vi/WpORsRstZCc/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:32:34 [PREVIEW] 6FrxCRLvikY already cached on disk
+debug 2026/09/11 22:32:35 [PREVIEW] A5mURRozXtg already cached on disk
+debug 2026/09/11 22:32:35 [PREVIEW] 6FrxCRLvikY already cached on disk
+debug 2026/09/11 22:32:35 [PREVIEW] WpORsRstZCc already cached on disk
+debug 2026/09/11 22:32:36 [PREVIEW] skip fetch for ESTp1LCFoJs: url="https://i.ytimg.com/vi/ESTp1LCFoJs/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:32:39 [PREVIEW] skip fetch for nM_ZUbSIA0Q: url="https://i.ytimg.com/vi/nM_ZUbSIA0Q/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:32:40 [PREVIEW] skip fetch for bpzeHvM5dCs: url="https://i.ytimg.com/vi/bpzeHvM5dCs/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:32:41 [PREVIEW] skip fetch for mW6tBXn_MsI: url="https://i.ytimg.com/vi/mW6tBXn_MsI/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:32:42 [PREVIEW] bpzeHvM5dCs already cached on disk
+debug 2026/09/11 22:32:42 [PREVIEW] nM_ZUbSIA0Q already cached on disk
+debug 2026/09/11 22:32:42 [PREVIEW] ESTp1LCFoJs already cached on disk
+debug 2026/09/11 22:32:42 [PREVIEW] WpORsRstZCc already cached on disk
+debug 2026/09/11 22:32:43 [PREVIEW] 6FrxCRLvikY already cached on disk
+debug 2026/09/11 22:32:43 [PREVIEW] A5mURRozXtg already cached on disk
+debug 2026/09/11 22:32:43 [PREVIEW] HfWu4GKe1hc already cached on disk
+debug 2026/09/11 22:32:44 [PREVIEW] A5mURRozXtg already cached on disk
+debug 2026/09/11 22:32:47 [PREVIEW] HfWu4GKe1hc already cached on disk
+debug 2026/09/11 22:32:47 [PREVIEW] A5mURRozXtg already cached on disk
+debug 2026/09/11 22:33:06 [PREVIEW] skip fetch for HfWu4GKe1hc: url="https://i.ytimg.com/vi/HfWu4GKe1hc/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:33:06 [PREVIEW] skip fetch for RSvU4J01jM4: url="https://i.ytimg.com/vi/RSvU4J01jM4/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:33:07 [PREVIEW] skip fetch for fCeiUX59_FM: url="https://i.ytimg.com/vi/fCeiUX59_FM/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:33:07 [PREVIEW] RSvU4J01jM4 already cached on disk
+debug 2026/09/11 22:33:07 [PREVIEW] HfWu4GKe1hc already cached on disk
+debug 2026/09/11 22:33:08 [PREVIEW] skip fetch for A5mURRozXtg: url="https://i.ytimg.com/vi/A5mURRozXtg/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:33:08 [PREVIEW] skip fetch for 6FrxCRLvikY: url="https://i.ytimg.com/vi/6FrxCRLvikY/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:33:08 [PREVIEW] skip fetch for WpORsRstZCc: url="https://i.ytimg.com/vi/WpORsRstZCc/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:33:08 [PREVIEW] skip fetch for ESTp1LCFoJs: url="https://i.ytimg.com/vi/ESTp1LCFoJs/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:33:09 [PREVIEW] skip fetch for nM_ZUbSIA0Q: url="https://i.ytimg.com/vi/nM_ZUbSIA0Q/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:33:09 [PREVIEW] skip fetch for bpzeHvM5dCs: url="https://i.ytimg.com/vi/bpzeHvM5dCs/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:33:09 [PREVIEW] skip fetch for mW6tBXn_MsI: url="https://i.ytimg.com/vi/mW6tBXn_MsI/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:33:10 [PREVIEW] bpzeHvM5dCs already cached on disk
+debug 2026/09/11 22:33:10 [PREVIEW] mW6tBXn_MsI already cached on disk
+debug 2026/09/11 22:33:11 [PREVIEW] bpzeHvM5dCs already cached on disk
+debug 2026/09/11 22:33:11 [PREVIEW] nM_ZUbSIA0Q already cached on disk
+debug 2026/09/11 22:33:12 [PREVIEW] ESTp1LCFoJs already cached on disk
+debug 2026/09/11 22:33:12 [PREVIEW] WpORsRstZCc already cached on disk
+debug 2026/09/11 22:33:12 [PREVIEW] 6FrxCRLvikY already cached on disk
+debug 2026/09/11 22:33:13 [PREVIEW] skip fetch for A5mURRozXtg: url="https://i.ytimg.com/vi/A5mURRozXtg/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:34:10 [PREVIEW] 6FrxCRLvikY already cached on disk
+debug 2026/09/11 22:34:11 [PREVIEW] skip fetch for A5mURRozXtg: url="https://i.ytimg.com/vi/A5mURRozXtg/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:34:11 [PREVIEW] 6FrxCRLvikY already cached on disk
+debug 2026/09/11 22:34:12 [PREVIEW] WpORsRstZCc already cached on disk
+debug 2026/09/11 22:34:12 [PREVIEW] ESTp1LCFoJs already cached on disk
+debug 2026/09/11 22:34:12 [PREVIEW] nM_ZUbSIA0Q already cached on disk
+debug 2026/09/11 22:40:44 [SYS] Initializing TUI Session
+debug 2026/09/11 22:41:29 [PREVIEW] skip fetch for _r-nPqWGG6c: url="https://i.ytimg.com/vi/_r-nPqWGG6c/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:41:38 [PREVIEW] iCfXgG83Pqs already cached on disk
+debug 2026/09/11 22:41:39 [PREVIEW] _r-nPqWGG6c already cached on disk
+debug 2026/09/11 22:41:40 [PREVIEW] iCfXgG83Pqs already cached on disk
+debug 2026/09/11 22:41:41 [PREVIEW] _r-nPqWGG6c already cached on disk
+debug 2026/09/11 22:41:41 [PREVIEW] skip fetch for Mllp-YSR4BQ: url="https://i.ytimg.com/vi/Mllp-YSR4BQ/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:41:43 [PREVIEW] _r-nPqWGG6c already cached on disk
+debug 2026/09/11 22:41:44 [PREVIEW] Mllp-YSR4BQ already cached on disk
+debug 2026/09/11 22:41:44 [PREVIEW] skip fetch for ZHj1W3JZ3Ow: url="https://i.ytimg.com/vi/ZHj1W3JZ3Ow/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:41:45 [PREVIEW] Mllp-YSR4BQ already cached on disk
+debug 2026/09/11 22:41:45 [PREVIEW] _r-nPqWGG6c already cached on disk
+debug 2026/09/11 22:41:48 [PREVIEW] Mllp-YSR4BQ already cached on disk
+debug 2026/09/11 22:41:48 [PREVIEW] ZHj1W3JZ3Ow already cached on disk
+debug 2026/09/11 22:41:48 [PREVIEW] skip fetch for YZeXfZ7gsc8: url="https://i.ytimg.com/vi/YZeXfZ7gsc8/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:41:48 [PREVIEW] skip fetch for 7g1w53qxNzM: url="https://i.ytimg.com/vi/7g1w53qxNzM/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:41:48 [PREVIEW] skip fetch for Q3IdDymP11E: url="https://i.ytimg.com/vi/Q3IdDymP11E/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:41:49 [PREVIEW] skip fetch for 51Zh8u3SS90: url="https://i.ytimg.com/vi/51Zh8u3SS90/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:41:49 [PREVIEW] skip fetch for fCeiUX59_FM: url="https://i.ytimg.com/vi/fCeiUX59_FM/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:42:08 [PREVIEW] 51Zh8u3SS90 already cached on disk
+debug 2026/09/11 22:42:08 [PREVIEW] Q3IdDymP11E already cached on disk
+debug 2026/09/11 22:42:09 [PREVIEW] 51Zh8u3SS90 already cached on disk
+debug 2026/09/11 22:42:09 [PREVIEW] fCeiUX59_FM already cached on disk
+debug 2026/09/11 22:42:09 [PREVIEW] skip fetch for Ssp2oQkoHo4: url="https://i.ytimg.com/vi/Ssp2oQkoHo4/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:42:09 [PREVIEW] fCeiUX59_FM already cached on disk
+debug 2026/09/11 22:42:10 [PREVIEW] 51Zh8u3SS90 already cached on disk
+debug 2026/09/11 22:42:10 [PREVIEW] Q3IdDymP11E already cached on disk
+debug 2026/09/11 22:42:10 [PREVIEW] 7g1w53qxNzM already cached on disk
+debug 2026/09/11 22:42:10 [PREVIEW] YZeXfZ7gsc8 already cached on disk
+debug 2026/09/11 22:42:10 [PREVIEW] ZHj1W3JZ3Ow already cached on disk
+debug 2026/09/11 22:42:11 [PREVIEW] Mllp-YSR4BQ already cached on disk
+debug 2026/09/11 22:42:11 [PREVIEW] _r-nPqWGG6c already cached on disk
+debug 2026/09/11 22:42:11 [PREVIEW] iCfXgG83Pqs already cached on disk
+debug 2026/09/11 22:42:11 [PREVIEW] _r-nPqWGG6c already cached on disk
+debug 2026/09/11 22:42:12 [PREVIEW] Mllp-YSR4BQ already cached on disk
+debug 2026/09/11 22:42:12 [PREVIEW] ZHj1W3JZ3Ow already cached on disk
+debug 2026/09/11 22:42:13 [PREVIEW] YZeXfZ7gsc8 already cached on disk
+debug 2026/09/11 22:42:13 [PREVIEW] 7g1w53qxNzM already cached on disk
+debug 2026/09/11 22:42:13 [PREVIEW] Q3IdDymP11E already cached on disk
+debug 2026/09/11 22:42:14 [PREVIEW] 51Zh8u3SS90 already cached on disk
+debug 2026/09/11 22:42:14 [PREVIEW] fCeiUX59_FM already cached on disk
+debug 2026/09/11 22:42:14 [PREVIEW] Ssp2oQkoHo4 already cached on disk
+debug 2026/09/11 22:43:10 [SYS] Initializing TUI Session
+debug 2026/09/11 22:43:23 [PREVIEW] skip fetch for Mllp-YSR4BQ: url="https://i.ytimg.com/vi/Mllp-YSR4BQ/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:43:24 [PREVIEW] _r-nPqWGG6c already cached on disk
+debug 2026/09/11 22:43:36 [PREVIEW] Mllp-YSR4BQ already cached on disk
+debug 2026/09/11 22:43:37 [PREVIEW] _r-nPqWGG6c already cached on disk
+debug 2026/09/11 22:52:59 [SYS] Initializing TUI Session
+debug 2026/09/11 22:53:15 [PREVIEW] skip fetch for Z8vDU6vUTj4: url="https://i.ytimg.com/vi/Z8vDU6vUTj4/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:53:15 [PREVIEW] fetching thumbnail for 9Px6mILHsI8 from https://i.ytimg.com/vi/9Px6mILHsI8/maxresdefault.jpg
+debug 2026/09/11 22:53:16 [PREVIEW] fetching thumbnail for wmYsGNr-Gv8 from https://i.ytimg.com/vi/wmYsGNr-Gv8/maxresdefault.jpg
+debug 2026/09/11 22:53:16 [PREVIEW] 9Px6mILHsI8 already cached on disk
+debug 2026/09/11 22:53:17 [PREVIEW] wmYsGNr-Gv8 already cached on disk
+debug 2026/09/11 22:53:17 [PREVIEW] skip fetch for HxWx5UuznGI: url="https://i.ytimg.com/vi/HxWx5UuznGI/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:53:17 [PREVIEW] skip fetch for zYkOmFOpJgE: url="https://i.ytimg.com/vi/zYkOmFOpJgE/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:53:17 [PREVIEW] fetching thumbnail for URItPTO9Aek from https://i.ytimg.com/vi/URItPTO9Aek/maxresdefault.jpg
+debug 2026/09/11 22:53:18 [PREVIEW] skip fetch for eRzVY6wsOss: url="https://i.ytimg.com/vi/eRzVY6wsOss/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:53:19 [PREVIEW] skip fetch for wAlX2z7oWYM: url="https://i.ytimg.com/vi/wAlX2z7oWYM/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:53:19 [PREVIEW] skip fetch for 9PLnAQ5RlbE: url="https://i.ytimg.com/vi/9PLnAQ5RlbE/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 22:53:20 [PREVIEW] wAlX2z7oWYM already cached on disk
+debug 2026/09/11 22:53:21 [PREVIEW] eRzVY6wsOss already cached on disk
+debug 2026/09/11 22:53:21 [PREVIEW] URItPTO9Aek already cached on disk
+debug 2026/09/11 22:53:21 [PREVIEW] zYkOmFOpJgE already cached on disk
+debug 2026/09/11 22:53:21 [PREVIEW] HxWx5UuznGI already cached on disk
+debug 2026/09/11 22:53:22 [PREVIEW] wmYsGNr-Gv8 already cached on disk
+debug 2026/09/11 22:53:22 [PREVIEW] 9Px6mILHsI8 already cached on disk
+debug 2026/09/11 22:53:22 [PREVIEW] Z8vDU6vUTj4 already cached on disk
+debug 2026/09/11 22:53:22 [PREVIEW] gbNgWKRILww already cached on disk
+debug 2026/09/11 22:53:26 [PREVIEW] Z8vDU6vUTj4 already cached on disk
+debug 2026/09/11 22:56:33 [SYS] Initializing TUI Session
+debug 2026/09/11 23:04:10 [SYS] Initializing TUI Session
+debug 2026/09/11 23:05:04 [PREVIEW] skip fetch for MjkbRx2qdI4: url="https://i.ytimg.com/vi/MjkbRx2qdI4/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 23:05:04 [PREVIEW] 3q_ijl-aaTI already cached on disk
+debug 2026/09/11 23:05:08 [PREVIEW] MjkbRx2qdI4 already cached on disk
+debug 2026/09/11 23:05:08 [PREVIEW] 3q_ijl-aaTI already cached on disk
+debug 2026/09/11 23:06:09 [PREVIEW] MjkbRx2qdI4 already cached on disk
+debug 2026/09/11 23:06:11 [PREVIEW] 3q_ijl-aaTI already cached on disk
+debug 2026/09/11 23:06:24 [PREVIEW] skip fetch for MjkbRx2qdI4: url="https://i.ytimg.com/vi/MjkbRx2qdI4/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 23:06:24 [PREVIEW] skip fetch for NyTkaQHdySM: url="https://i.ytimg.com/vi/NyTkaQHdySM/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 23:06:24 [PREVIEW] skip fetch for rNOcurn3tf8: url="https://i.ytimg.com/vi/rNOcurn3tf8/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 23:06:24 [PREVIEW] skip fetch for eV9Pp3rkCcY: url="https://i.ytimg.com/vi/eV9Pp3rkCcY/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 23:06:24 [PREVIEW] skip fetch for awyt7-G_3wU: url="https://i.ytimg.com/vi/awyt7-G_3wU/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 23:06:25 [PREVIEW] skip fetch for 8vMK2GAJY7o: url="https://i.ytimg.com/vi/8vMK2GAJY7o/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 23:06:25 [PREVIEW] awyt7-G_3wU already cached on disk
+debug 2026/09/11 23:06:25 [PREVIEW] eV9Pp3rkCcY already cached on disk
+debug 2026/09/11 23:06:25 [PREVIEW] rNOcurn3tf8 already cached on disk
+debug 2026/09/11 23:06:25 [PREVIEW] NyTkaQHdySM already cached on disk
+debug 2026/09/11 23:06:25 [PREVIEW] MjkbRx2qdI4 already cached on disk
+debug 2026/09/11 23:06:26 [PREVIEW] 3q_ijl-aaTI already cached on disk
+debug 2026/09/11 23:06:47 [PREVIEW] MjkbRx2qdI4 already cached on disk
+debug 2026/09/11 23:06:47 [PREVIEW] NyTkaQHdySM already cached on disk
+debug 2026/09/11 23:06:47 [PREVIEW] rNOcurn3tf8 already cached on disk
+debug 2026/09/11 23:06:48 [PREVIEW] eV9Pp3rkCcY already cached on disk
+debug 2026/09/11 23:06:48 [PREVIEW] awyt7-G_3wU already cached on disk
+debug 2026/09/11 23:06:48 [PREVIEW] 8vMK2GAJY7o already cached on disk
+debug 2026/09/11 23:06:48 [PREVIEW] skip fetch for vKZMntNPdaE: url="https://i.ytimg.com/vi/vKZMntNPdaE/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 23:06:48 [PREVIEW] skip fetch for hMSKrml3SYo: url="https://i.ytimg.com/vi/hMSKrml3SYo/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 23:06:49 [PREVIEW] skip fetch for BbwS74w3kzM: url="https://i.ytimg.com/vi/BbwS74w3kzM/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 23:06:49 [PREVIEW] hMSKrml3SYo already cached on disk
+debug 2026/09/11 23:06:49 [PREVIEW] vKZMntNPdaE already cached on disk
+debug 2026/09/11 23:06:49 [PREVIEW] 8vMK2GAJY7o already cached on disk
+debug 2026/09/11 23:06:49 [PREVIEW] awyt7-G_3wU already cached on disk
+debug 2026/09/11 23:06:50 [PREVIEW] eV9Pp3rkCcY already cached on disk
+debug 2026/09/11 23:06:50 [PREVIEW] rNOcurn3tf8 already cached on disk
+debug 2026/09/11 23:06:50 [PREVIEW] NyTkaQHdySM already cached on disk
+debug 2026/09/11 23:06:50 [PREVIEW] MjkbRx2qdI4 already cached on disk
+debug 2026/09/11 23:06:50 [PREVIEW] 3q_ijl-aaTI already cached on disk
+debug 2026/09/11 23:07:43 [PREVIEW] MjkbRx2qdI4 already cached on disk
+debug 2026/09/11 23:07:47 [PREVIEW] 3q_ijl-aaTI already cached on disk
+debug 2026/09/11 23:08:06 [PREVIEW] MjkbRx2qdI4 already cached on disk
+debug 2026/09/11 23:08:09 [PREVIEW] 3q_ijl-aaTI already cached on disk
+debug 2026/09/11 23:08:10 [PREVIEW] MjkbRx2qdI4 already cached on disk
+debug 2026/09/11 23:08:10 [PREVIEW] 3q_ijl-aaTI already cached on disk
+debug 2026/09/11 23:09:04 [PREVIEW] MjkbRx2qdI4 already cached on disk
+debug 2026/09/11 23:09:04 [PREVIEW] NyTkaQHdySM already cached on disk
+debug 2026/09/11 23:09:04 [PREVIEW] rNOcurn3tf8 already cached on disk
+debug 2026/09/11 23:09:04 [PREVIEW] eV9Pp3rkCcY already cached on disk
+debug 2026/09/11 23:09:05 [PREVIEW] rNOcurn3tf8 already cached on disk
+debug 2026/09/11 23:09:05 [PREVIEW] NyTkaQHdySM already cached on disk
+debug 2026/09/11 23:09:05 [PREVIEW] MjkbRx2qdI4 already cached on disk
+debug 2026/09/11 23:09:06 [PREVIEW] 3q_ijl-aaTI already cached on disk
+debug 2026/09/11 23:26:12 [SYS] Initializing TUI Session
+debug 2026/09/11 23:30:24 [PREVIEW] skip fetch for deeMQwM0u6c: url="https://i.ytimg.com/vi/deeMQwM0u6c/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 23:30:24 [PREVIEW] skip fetch for 1Qn81eLLFEQ: url="https://i.ytimg.com/vi/1Qn81eLLFEQ/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 23:30:25 [PREVIEW] skip fetch for OH7YO_XUH5w: url="https://i.ytimg.com/vi/OH7YO_XUH5w/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 23:30:25 [PREVIEW] skip fetch for ips97X-AyGs: url="https://i.ytimg.com/vi/ips97X-AyGs/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 23:30:25 [PREVIEW] skip fetch for VWBpmpqUuZQ: url="https://i.ytimg.com/vi/VWBpmpqUuZQ/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 23:30:25 [PREVIEW] skip fetch for MXyT3wNPMj4: url="https://i.ytimg.com/vi/MXyT3wNPMj4/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 23:30:26 [PREVIEW] skip fetch for bwrLC78jcf8: url="https://i.ytimg.com/vi/bwrLC78jcf8/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 23:30:26 [PREVIEW] skip fetch for QbHyJdFOx8g: url="https://i.ytimg.com/vi/QbHyJdFOx8g/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 23:30:26 [PREVIEW] skip fetch for QWaphLAdnmI: url="https://i.ytimg.com/vi/QWaphLAdnmI/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 23:30:26 [PREVIEW] skip fetch for TjDyO0JiGjQ: url="https://i.ytimg.com/vi/TjDyO0JiGjQ/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 23:30:27 [PREVIEW] skip fetch for AUkWBYunNEM: url="https://i.ytimg.com/vi/AUkWBYunNEM/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 23:30:27 [PREVIEW] skip fetch for 7GwLnsVUwHY: url="https://i.ytimg.com/vi/7GwLnsVUwHY/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 23:30:27 [PREVIEW] skip fetch for rVD-zV6ctoM: url="https://i.ytimg.com/vi/rVD-zV6ctoM/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 23:30:27 [PREVIEW] skip fetch for YGAVC5L0goY: url="https://i.ytimg.com/vi/YGAVC5L0goY/maxresdefault.jpg" inFlight=true
+debug 2026/09/11 23:30:28 [PREVIEW] rVD-zV6ctoM already cached on disk
+debug 2026/09/11 23:30:28 [PREVIEW] 7GwLnsVUwHY already cached on disk
+debug 2026/09/11 23:30:29 [PREVIEW] AUkWBYunNEM already cached on disk
+debug 2026/09/11 23:30:29 [PREVIEW] TjDyO0JiGjQ already cached on disk
+debug 2026/09/11 23:30:29 [PREVIEW] QWaphLAdnmI already cached on disk
+debug 2026/09/11 23:30:29 [PREVIEW] QbHyJdFOx8g already cached on disk
+debug 2026/09/11 23:30:30 [PREVIEW] bwrLC78jcf8 already cached on disk
+debug 2026/09/11 23:30:30 [PREVIEW] MXyT3wNPMj4 already cached on disk
+debug 2026/09/11 23:30:30 [PREVIEW] VWBpmpqUuZQ already cached on disk
+debug 2026/09/11 23:30:30 [PREVIEW] ips97X-AyGs already cached on disk
+debug 2026/09/11 23:30:30 [PREVIEW] OH7YO_XUH5w already cached on disk
+debug 2026/09/11 23:30:31 [PREVIEW] 1Qn81eLLFEQ already cached on disk
+debug 2026/09/11 23:30:31 [PREVIEW] deeMQwM0u6c already cached on disk
+debug 2026/09/11 23:30:31 [PREVIEW] iUFlb4YYYKo already cached on disk
+debug 2026/09/11 23:30:32 [PREVIEW] deeMQwM0u6c already cached on disk
+debug 2026/09/11 23:30:33 [PREVIEW] 1Qn81eLLFEQ already cached on disk
+debug 2026/09/11 23:30:33 [PREVIEW] OH7YO_XUH5w already cached on disk
+debug 2026/09/11 23:30:33 [PREVIEW] ips97X-AyGs already cached on disk
+debug 2026/09/11 23:30:33 [PREVIEW] VWBpmpqUuZQ already cached on disk
+debug 2026/09/11 23:30:34 [PREVIEW] ips97X-AyGs already cached on disk
+debug 2026/09/11 23:30:34 [PREVIEW] OH7YO_XUH5w already cached on disk
+debug 2026/09/11 23:30:34 [PREVIEW] 1Qn81eLLFEQ already cached on disk
+debug 2026/09/11 23:30:35 [PREVIEW] deeMQwM0u6c already cached on disk
+debug 2026/09/11 23:30:35 [PREVIEW] iUFlb4YYYKo already cached on disk
+debug 2026/09/11 23:30:36 [PREVIEW] iUFlb4YYYKo already cached on disk
+debug 2026/09/11 23:30:36 [PREVIEW] deeMQwM0u6c already cached on disk
+debug 2026/09/11 23:30:37 [PREVIEW] iUFlb4YYYKo already cached on disk
+debug 2026/09/11 23:30:37 [PREVIEW] iUFlb4YYYKo already cached on disk
+debug 2026/09/11 23:30:37 [PREVIEW] deeMQwM0u6c already cached on disk
+debug 2026/09/11 23:30:37 [PREVIEW] iUFlb4YYYKo already cached on disk
+debug 2026/09/11 23:30:38 [PREVIEW] deeMQwM0u6c already cached on disk
+debug 2026/09/11 23:30:38 [PREVIEW] 1Qn81eLLFEQ already cached on disk
+debug 2026/09/11 23:30:38 [PREVIEW] OH7YO_XUH5w already cached on disk
+debug 2026/09/11 23:30:39 [PREVIEW] ips97X-AyGs already cached on disk
+debug 2026/09/11 23:30:39 [PREVIEW] OH7YO_XUH5w already cached on disk
+debug 2026/09/11 23:30:39 [PREVIEW] 1Qn81eLLFEQ already cached on disk
+debug 2026/09/11 23:30:39 [PREVIEW] deeMQwM0u6c already cached on disk
+debug 2026/09/11 23:30:40 [PREVIEW] 1Qn81eLLFEQ already cached on disk
+debug 2026/09/11 23:30:40 [PREVIEW] OH7YO_XUH5w already cached on disk
+debug 2026/09/11 23:30:40 [PREVIEW] ips97X-AyGs already cached on disk
+debug 2026/09/11 23:30:41 [PREVIEW] VWBpmpqUuZQ already cached on disk
+debug 2026/09/11 23:30:41 [PREVIEW] ips97X-AyGs already cached on disk
+debug 2026/09/11 23:30:42 [PREVIEW] OH7YO_XUH5w already cached on disk
+debug 2026/09/11 23:30:42 [PREVIEW] 1Qn81eLLFEQ already cached on disk
+debug 2026/09/11 23:30:42 [PREVIEW] deeMQwM0u6c already cached on disk
+debug 2026/09/11 23:30:43 [PREVIEW] iUFlb4YYYKo already cached on disk
+debug 2026/09/11 23:30:48 [PREVIEW] deeMQwM0u6c already cached on disk
+debug 2026/09/11 23:30:49 [PREVIEW] iUFlb4YYYKo already cached on disk
+debug 2026/09/11 23:30:52 [PREVIEW] iUFlb4YYYKo already cached on disk
+WARNING: webm doesn't support embedding a thumbnail, mkv will be used
+debug 2026/09/11 23:33:25 [PREVIEW] deeMQwM0u6c already cached on disk
+debug 2026/09/11 23:33:26 [PREVIEW] 1Qn81eLLFEQ already cached on disk
+debug 2026/09/11 23:33:26 [PREVIEW] OH7YO_XUH5w already cached on disk
+debug 2026/09/11 23:33:27 [PREVIEW] ips97X-AyGs already cached on disk
+debug 2026/09/11 23:33:27 [PREVIEW] VWBpmpqUuZQ already cached on disk
+debug 2026/09/11 23:33:27 [PREVIEW] MXyT3wNPMj4 already cached on disk
+debug 2026/09/11 23:33:28 [PREVIEW] bwrLC78jcf8 already cached on disk
+debug 2026/09/11 23:33:28 [PREVIEW] QbHyJdFOx8g already cached on disk
+debug 2026/09/11 23:33:29 [PREVIEW] QWaphLAdnmI already cached on disk
+debug 2026/09/11 23:33:29 [PREVIEW] TjDyO0JiGjQ already cached on disk
+debug 2026/09/11 23:33:29 [PREVIEW] AUkWBYunNEM already cached on disk
+debug 2026/09/11 23:33:30 [PREVIEW] 7GwLnsVUwHY already cached on disk
+debug 2026/09/11 23:33:30 [PREVIEW] rVD-zV6ctoM already cached on disk
+debug 2026/09/11 23:33:30 [PREVIEW] YGAVC5L0goY already cached on disk
+debug 2026/09/11 23:47:33 [SYS] Initializing TUI Session
+debug 2026/09/11 23:59:09 [SYS] Initializing TUI Session
+debug 2026/09/12 00:10:33 [SYS] Initializing TUI Session
+debug 2026/09/12 00:19:45 [SYS] Initializing TUI Session
+
+Usage: yt-dlp [OPTIONS] URL [URL...]
+
+yt-dlp: error: no such option: -W
+debug 2026/09/12 00:28:00 Download job 0 failed: exit status 2
+debug 2026/09/12 00:40:58 [SYS] Initializing TUI Session
+debug 2026/09/12 00:50:53 [SYS] Initializing TUI Session
+debug 2026/09/12 00:57:01 [SYS] Initializing TUI Session
+debug 2026/09/12 01:02:07 [SYS] Initializing TUI Session
+debug 2026/09/12 01:05:26 [SYS] Initializing TUI Session
+debug 2026/09/12 01:11:28 [SYS] Initializing TUI Session
+debug 2026/09/12 01:15:41 [SYS] Initializing TUI Session
+debug 2026/09/12 01:15:54 [PREVIEW] render failed for ZD1VJg52mn8: invalid JPEG format: short Huffman data
+debug 2026/09/12 01:18:46 [SYS] Initializing TUI Session
+debug 2026/09/12 01:21:12 [SYS] Initializing TUI Session
+debug 2026/09/12 01:25:13 [SYS] Initializing TUI Session
+debug 2026/09/12 01:27:05 [SYS] Initializing TUI Session
+debug 2026/09/12 01:28:19 [SYS] Initializing TUI Session
+debug 2026/09/12 01:29:51 [SYS] Initializing TUI Session
