@@ -79,8 +79,9 @@ type Model struct {
 	TotalItems      int
 	TotalDownloaded int
 
-	Width  int
-	Height int
+	Width           int
+	Height          int
+	fontShrinkDelta float64
 
 	ready        bool
 	Err          error
@@ -93,31 +94,26 @@ func InitialModel() *Model {
 		log.Fatal("Could not get current user")
 	}
 	return &Model{
-		ChoiceType:    "Audio",
-		ChoiceMode:    "Single",
-		Searching:     true,
-		Blink:         true,
-		Selected:      make(map[int]string),
-		FilteredList:  []downloader.Video{},
-		SizeCache:     make(map[string]string),
-		SizeInFlight:  make(map[string]bool),
-		User:          currentUser.HomeDir,
-		MaxWorkers:    3,
-		DownloadState: StatusIdle,
+		ChoiceType:      "Audio",
+		ChoiceMode:      "Single",
+		Searching:       true,
+		Blink:           true,
+		Selected:        make(map[int]string),
+		FilteredList:    []downloader.Video{},
+		SizeCache:       make(map[string]string),
+		SizeInFlight:    make(map[string]bool),
+		User:            currentUser.HomeDir,
+		MaxWorkers:      3,
+		DownloadState:   StatusIdle,
+		fontShrinkDelta: 3.0,
 	}
 }
 
 func (m *Model) Init() tea.Cmd {
 	log.Println("[SYS] Initializing TUI Session")
+	shrinkKittyFont(m.fontShrinkDelta)
 	return func() tea.Msg {
 		return blinkMsg{}
-	}
-}
-
-func (m *Model) Cleanup() {
-	dir := thumbCacheDir()
-	if err := os.RemoveAll(dir); err != nil {
-		log.Printf("[CLEANUP] failed to remove thumb cache: %v", err)
 	}
 }
 
@@ -152,7 +148,21 @@ func (m *Model) resetInFlight() {
 	m.inFlight = nil
 }
 
+func (m *Model) Cleanup() {
+	restoreKittyFont(m.fontShrinkDelta)
+	deleteAllKittyImages()
+	dir := thumbCacheDir()
+	if err := os.RemoveAll(dir); err != nil {
+		log.Printf("[CLEANUP] failed to remove thumb cache: %v", err)
+	}
+}
+
 func (m *Model) purgePreviewCache() {
+	for _, pv := range m.previewCache {
+		if pv.kittyID != 0 {
+			deleteKittyImage(pv.kittyID)
+		}
+	}
 	m.previewCache = nil
 	m.inFlight = nil
 }

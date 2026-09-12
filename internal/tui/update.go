@@ -359,6 +359,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			log.Printf("[PREVIEW] render failed for %s: %v", msg.videoID, msg.err)
 			return m, nil
 		}
+		if msg.preview.kittyBytes != nil {
+			os.Stdout.Write(msg.preview.kittyBytes)
+		}
 		if m.previewCache == nil {
 			m.previewCache = make(map[string]renderedPreview)
 		}

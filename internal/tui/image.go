@@ -12,9 +12,14 @@ import (
 )
 
 type renderedPreview struct {
-	data string
+	data       string // what view.go actually renders — unchanged contract
+	kittyID    uint32 // 0 unless this is a Kitty-protocol image
+	kittyBytes []byte // transmission bytes; flushed once by Update()
 }
 
+// renderPlaceholder is unchanged as far as every caller is concerned:
+// same signature, same return contract. Internally it now picks the best
+// available rendering path for the current terminal.
 func renderPlaceholder(imagePath string, cols, rows int) (renderedPreview, error) {
 	if cols < 1 {
 		cols = 1
@@ -27,23 +32,40 @@ func renderPlaceholder(imagePath string, cols, rows int) (renderedPreview, error
 	if err != nil {
 		return renderedPreview{}, err
 	}
-	defer func() {
-		_ = f.Close()
-	}()
+	defer f.Close()
 
 	img, _, err := image.Decode(f)
 	if err != nil {
 		return renderedPreview{}, err
 	}
 
-	targetW := cols
-	targetH := rows * 2 // 2 pixels per terminal character (upper/lower half blocks)
+	if kittySupported() && cols-1 < len(kittyDiacritics) && rows-1 < len(kittyDiacritics) {
+		if pv, err := renderKittyPreview(img, cols, rows); err == nil {
+			return pv, nil
+		}
+		// fall through to ANSI on any Kitty-path failure
+	}
+	return renderANSIPreview(img, cols, rows)
+}
 
-	// Create the canvas and fill it with your terminal background color (Letterboxing)
+func renderKittyPreview(img image.Image, cols, rows int) (renderedPreview, error) {
+	id := nextKittyImageID()
+	tx, err := encodeKittyTransmission(img, id, cols, rows)
+	if err != nil {
+		return renderedPreview{}, err
+	}
+	grid := kittyPlaceholderGrid(id, cols, rows)
+	return renderedPreview{data: grid, kittyID: id, kittyBytes: tx}, nil
+}
+
+// renderANSIPreview is your existing half-block renderer, untouched.
+func renderANSIPreview(img image.Image, cols, rows int) (renderedPreview, error) {
+	targetW := cols
+	targetH := rows * 2
+
 	dst := image.NewRGBA(image.Rect(0, 0, targetW, targetH))
 	draw.Draw(dst, dst.Bounds(), &image.Uniform{color.RGBA{17, 17, 27, 255}}, image.Point{}, draw.Src)
 
-	// Calculate aspect ratio to prevent stretching
 	bounds := img.Bounds()
 	w, h := bounds.Dx(), bounds.Dy()
 	ratio := float64(targetW) / float64(w)
@@ -57,8 +79,6 @@ func renderPlaceholder(imagePath string, cols, rows int) (renderedPreview, error
 		offsetX := (targetW - drawW) / 2
 		offsetY := (targetH - drawH) / 2
 		drawRect := image.Rect(offsetX, offsetY, offsetX+drawW, offsetY+drawH)
-
-		// High-quality Catmull-Rom resampling
 		draw.CatmullRom.Scale(dst, drawRect, img, img.Bounds(), draw.Over, nil)
 	}
 
@@ -67,10 +87,8 @@ func renderPlaceholder(imagePath string, cols, rows int) (renderedPreview, error
 		for x := 0; x < targetW; x++ {
 			top := dst.RGBAAt(x, y)
 			bottom := dst.RGBAAt(x, y+1)
-
 			fmt.Fprintf(&sb, "\x1b[38;2;%d;%d;%dm\x1b[48;2;%d;%d;%dm▀",
-				top.R, top.G, top.B,
-				bottom.R, bottom.G, bottom.B)
+				top.R, top.G, top.B, bottom.R, bottom.G, bottom.B)
 		}
 		sb.WriteString("\x1b[0m\n")
 	}

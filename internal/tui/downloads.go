@@ -142,13 +142,13 @@ func thumbCacheDir() string {
 func thumbURL(v downloader.Video) string {
 	url := v.Thumbnail
 	if url == "" {
-		return "https://i.ytimg.com/vi/" + v.ID + "/mqdefault.jpg"
+		return "https://i.ytimg.com/vi/" + v.ID + "/maxresdefault.jpg"
 	}
-	for _, hires := range []string{"maxresdefault", "hqdefault", "sddefault"} {
-		url = strings.ReplaceAll(url, hires, "mqdefault")
+	for _, lower := range []string{"mqdefault", "sddefault", "hqdefault"} {
+		url = strings.ReplaceAll(url, lower, "maxresdefault")
 	}
 	if !strings.HasSuffix(url, ".jpg") {
-		return "https://i.ytimg.com/vi/" + v.ID + "/mqdefault.jpg"
+		return "https://i.ytimg.com/vi/" + v.ID + "/maxresdefault.jpg"
 	}
 	return url
 }
@@ -163,10 +163,10 @@ func fetchOneThumbnail(videos []downloader.Video, idx int) tea.Cmd {
 		if _, err := os.Stat(dest); err == nil {
 			return thumbnailReadyMsg{videoID: v.ID}
 		}
-		cmd := exec.Command("curl", "--silent", "--max-time", "6", "--output", dest, thumbURL(v))
-		cmd.Stderr = nil
-		cmd.Stdout = nil
-		_ = cmd.Run()
+		if err := downloadThumbnailTo(thumbURL(v), dest); err != nil {
+			// fall back to a URL guaranteed to exist
+			_ = downloadThumbnailTo("https://i.ytimg.com/vi/"+v.ID+"/hqdefault.jpg", dest)
+		}
 		return thumbnailReadyMsg{videoID: v.ID}
 	}
 }
