@@ -33,7 +33,7 @@ Search by name, paste a raw video URL, preview the thumbnail in full quality (if
 ```sh
 git clone https://github.com/<your-username>/yt-media.git
 cd yt-media
-go build -o yt-media ./cmd/yt-dl
+go build -o yt-media ./cmd/yt-media
 ./yt-media
 ```
 
