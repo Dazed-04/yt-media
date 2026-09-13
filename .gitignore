@@ -1,0 +1,20 @@
+# Build output
+/yt-media
+/dist/
+
+# Debug/log output
+debug.log
+*.log
+
+# Go
+*.test
+*.out
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp

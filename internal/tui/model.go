@@ -153,17 +153,31 @@ func (m *Model) previewImageDims() (cols, rows int) {
 	if m.DownloadState != StatusIdle {
 		progressH = 3 // Progress margin + border + content
 	}
+	artBorders := 2 // Top and bottom borders of the art box
+	bottomBordersH := 2
 
-	bottomH := 15       // Info & List boxes (13 content lines + 2 borders)
-	m.VisibleListH = 13 // Inner content capacity
-	artBorders := 2     // Top and bottom borders of the art box
+	const idealListH = 13
+	const minListH = 4
+	const minArtRows = 4
 
-	// Exactly accounts for every vertical line on the screen
-	fixedOverhead := headerH + artBorders + bottomH + progressH + footerH
+	fixedOverhead := headerH + artBorders + footerH + progressH
 
-	rows = m.Height - fixedOverhead
-	if rows < 4 {
-		rows = 4
+	m.VisibleListH = idealListH
+	for m.VisibleListH > 0 {
+		rows = m.Height - fixedOverhead - (m.VisibleListH + bottomBordersH)
+		if rows >= minArtRows {
+			break
+		}
+		m.VisibleListH--
+	}
+
+	if m.VisibleListH < minListH {
+		m.VisibleListH = 0
+		rows = m.Height - fixedOverhead
+	}
+
+	if rows < minArtRows {
+		rows = minArtRows
 	}
 	return
 }

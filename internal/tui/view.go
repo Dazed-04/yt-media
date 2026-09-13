@@ -69,6 +69,9 @@ func (m Model) View() tea.View {
 		Render(searchBarContent)
 
 	imageCols, imageRows := m.previewImageDims()
+	artW := m.Width - 4
+	const minBottomWidth = 60
+	showBottomSection := m.VisibleListH > 0 && len(m.FilteredList) > 0 && artW >= minBottomWidth
 
 	// --- 2. Top Block (Theater Art) ---
 	var imageBlock string
@@ -100,8 +103,7 @@ func (m Model) View() tea.View {
 
 	// --- 3. Bottom Blocks ---
 	var bottomSection string
-	if m.VisibleListH > 0 && len(m.FilteredList) > 0 {
-		artW := m.Width - 4
+	if showBottomSection {
 		infoW := int(float64(artW) * 0.35)
 		listW := artW - infoW - 2
 
@@ -334,8 +336,12 @@ func (m Model) View() tea.View {
 	// --- Assembly ---
 	var finalBlocks []string
 	finalBlocks = append(finalBlocks, headerBox, artBox)
-	if m.VisibleListH > 0 && len(m.FilteredList) > 0 {
+	if showBottomSection {
 		finalBlocks = append(finalBlocks, bottomSection)
+	} else if len(m.FilteredList) > 0 {
+		current := m.FilteredList[m.Cursor]
+		narrowHint := lipgloss.NewStyle().Width(m.Width-4).Margin(0, 2).Foreground(lipgloss.Color("#585B70")).Render(fmt.Sprintf("%s  (resize terminal for details)", safeTruncate(current.GetDisplayString(), m.Width-30)))
+		finalBlocks = append(finalBlocks, narrowHint)
 	}
 	if m.DownloadState != StatusIdle {
 		finalBlocks = append(finalBlocks, progressUI)

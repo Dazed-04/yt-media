@@ -37,7 +37,7 @@ func Path() string {
 		home, _ := os.UserHomeDir()
 		dir = filepath.Join(home, ".config")
 	}
-	return filepath.Join(dir, "yt-downloader", "config.json")
+	return filepath.Join(dir, "yt-media", "config.json")
 }
 
 // Load reads the config file, writing a commented default one on first run.
