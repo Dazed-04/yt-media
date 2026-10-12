@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/user"
@@ -49,7 +50,6 @@ type Model struct {
 	ChoiceType string
 	ChoiceMode string
 
-	Selected   map[int]string
 	Searching  bool
 	IsFetching bool
 	SpinnerIdx int
@@ -65,6 +65,17 @@ type Model struct {
 	SkippedItems []string
 	previewCache map[string]renderedPreview
 	inFlight     map[string]bool
+
+	// Download queue (persisted to disk between runs)
+	Queue       []DownloadReq
+	QueueOpen   bool
+	QueueCursor int
+
+	Focused bool // terminal focus, from tea.FocusMsg / tea.BlurMsg
+
+	Flash    string // transient footer message
+	FlashErr bool
+	flashSeq int
 
 	// Caching for Async Size Fetching
 	SizeCache    map[string]string
@@ -85,9 +96,8 @@ type Model struct {
 	Height          int
 	fontShrinkDelta float64
 
-	ready        bool
-	Err          error
-	ErrorMessage string
+	ready bool
+	Err   error
 }
 
 func InitialModel(cfg config.Config) *Model {
@@ -101,12 +111,13 @@ func InitialModel(cfg config.Config) *Model {
 		ChoiceMode:      "Single",
 		Searching:       true,
 		Blink:           true,
-		Selected:        make(map[int]string),
+		Focused:         true,
+		Queue:           loadQueue(),
 		FilteredList:    []downloader.Video{},
 		SizeCache:       make(map[string]string),
 		SizeInFlight:    make(map[string]bool),
 		User:            currentUser.HomeDir,
-		MaxWorkers:      cfg.MaxWorkers,
+		MaxWorkers:      max(cfg.MaxWorkers, 1),
 		DownloadState:   StatusIdle,
 		fontShrinkDelta: cfg.FontShrinkDelta,
 	}
@@ -115,8 +126,20 @@ func InitialModel(cfg config.Config) *Model {
 func (m *Model) Init() tea.Cmd {
 	log.Println("[SYS] Initializing TUI Session")
 	shrinkKittyFont(m.fontShrinkDelta)
-	return func() tea.Msg {
-		return blinkMsg{}
+	cmds := []tea.Cmd{func() tea.Msg { return blinkMsg{} }}
+	if n := len(m.Queue); n > 0 {
+		cmds = append(cmds, m.flash(fmt.Sprintf("Restored %d queued item(s) - press w to view", n), false))
+	}
+	return tea.Batch(cmds...)
+}
+
+func (m *Model) Cleanup() {
+	m.persistQueue()
+	restoreKittyFont(m.fontShrinkDelta)
+	deleteAllKittyImages()
+	dir := thumbCacheDir()
+	if err := os.RemoveAll(dir); err != nil {
+		log.Printf("[CLEANUP] failed to remove thumb cache: %v", err)
 	}
 }
 
@@ -184,15 +207,6 @@ func (m *Model) previewImageDims() (cols, rows int) {
 
 func (m *Model) resetInFlight() {
 	m.inFlight = nil
-}
-
-func (m *Model) Cleanup() {
-	restoreKittyFont(m.fontShrinkDelta)
-	deleteAllKittyImages()
-	dir := thumbCacheDir()
-	if err := os.RemoveAll(dir); err != nil {
-		log.Printf("[CLEANUP] failed to remove thumb cache: %v", err)
-	}
 }
 
 func (m *Model) purgePreviewCache() {

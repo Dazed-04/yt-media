@@ -111,19 +111,13 @@ func (m Model) View() tea.View {
 
 		makeRow := func(label, value string) string {
 			lblBox := lipgloss.NewStyle().Width(10).Align(lipgloss.Left).Foreground(lipgloss.Color("#89B4FA")).Bold(true).Render(label)
-			valW := infoW - 14
-			if valW < 2 {
-				valW = 2
-			}
+			valW := max(infoW-14, 2)
 			value = safeTruncate(value, valW)
 			valBox := lipgloss.NewStyle().Width(valW).Align(lipgloss.Right).Foreground(lipgloss.Color("#A6ADC8")).Render(value)
 			return lipgloss.JoinHorizontal(lipgloss.Top, lblBox, valBox)
 		}
 
-		valW := infoW - 14
-		if valW < 2 {
-			valW = 2
-		}
+		valW := max(infoW-14, 2)
 		nameLabel := lipgloss.NewStyle().Width(10).Align(lipgloss.Left).Foreground(lipgloss.Color("#89B4FA")).Bold(true).Render("Name:")
 		blankLabel := lipgloss.NewStyle().Width(10).Render("")
 
@@ -139,8 +133,8 @@ func (m Model) View() tea.View {
 		nameBlock := strings.Join(nameRows, "\n")
 
 		selectedType := m.ChoiceType
-		if t, ok := m.Selected[m.Cursor]; ok {
-			selectedType = t
+		if qi := m.queueIndex(current.ID); qi >= 0 {
+			selectedType = m.Queue[qi].Type
 		}
 
 		// Read Async Fetched Size
@@ -176,28 +170,26 @@ func (m Model) View() tea.View {
 
 		var listBuilder strings.Builder
 		n := len(m.FilteredList)
-		visibleCount := m.VisibleListH
-		if visibleCount > n {
-			visibleCount = n
-		}
+		visibleCount := min(m.VisibleListH, n)
 
-		for row := 0; row < visibleCount; row++ {
+		for row := range visibleCount {
 			i := (m.ListOffset + row) % n
 			video := m.FilteredList[i]
+			queuedType, isQueued := "", false
+			if qi := m.queueIndex(video.ID); qi >= 0 {
+				queuedType, isQueued = m.Queue[qi].Type, true
+			}
 			bullet := "○"
 			hasCustomBadge := false
 
-			if _, ok := m.Selected[i]; ok {
+			if isQueued {
 				bullet = "●"
 				hasCustomBadge = true
 			} else if i == m.Cursor {
 				hasCustomBadge = true
 			}
 
-			availableTextW := listW - 10
-			if availableTextW < 5 {
-				availableTextW = 5
-			}
+			availableTextW := max(listW-10, 5)
 
 			effectiveWidth := availableTextW
 			if hasCustomBadge {
@@ -208,9 +200,9 @@ func (m Model) View() tea.View {
 			}
 
 			var modeLabel string
-			if typ, ok := m.Selected[i]; ok {
+			if isQueued {
 				modeBadge := lipgloss.NewStyle().Foreground(lipgloss.Color("#11111B")).Background(lipgloss.Color("#CBA6F7")).Padding(0, 1)
-				if typ == "Audio" {
+				if queuedType == "Audio" {
 					modeLabel = modeBadge.Render("A") + " "
 				} else {
 					modeLabel = modeBadge.Render("V") + " "
@@ -223,7 +215,7 @@ func (m Model) View() tea.View {
 			if i == m.Cursor {
 				bullet = lipgloss.NewStyle().Foreground(lipgloss.Color("#F9E2AF")).Render(bullet)
 				lineStyle = lineStyle.Foreground(lipgloss.Color("#F9E2AF")).Bold(true)
-			} else if _, ok := m.Selected[i]; ok {
+			} else if isQueued {
 				bullet = lipgloss.NewStyle().Foreground(lipgloss.Color("#A6E3A1")).Render(bullet)
 			}
 
@@ -279,10 +271,7 @@ func (m Model) View() tea.View {
 		leftBox := lipgloss.NewStyle().Foreground(lipgloss.Color("#89B4FA")).Bold(true).Render(leftStr)
 		sepBox := lipgloss.NewStyle().Foreground(lipgloss.Color("#313244")).Render(" │ ")
 
-		rightW := barW - lipgloss.Width(leftBox) - lipgloss.Width(sepBox) - 4
-		if rightW < 5 {
-			rightW = 5
-		}
+		rightW := max(barW-lipgloss.Width(leftBox)-lipgloss.Width(sepBox)-4, 5)
 
 		progRatio := 0.0
 		if m.TotalItems > 0 {
@@ -317,13 +306,17 @@ func (m Model) View() tea.View {
 	}
 
 	// --- 5. Footer (Hints) ---
-	hintStr := fmt.Sprintf("(esc: reset • /: search • tab: default %s • space: select • enter: download • r: retry failed)", m.ChoiceType)
+	hintStr := fmt.Sprintf("(esc: reset • /: search • tab: default %s • space: queue • w: queue [%d] • enter: download • r: retry failed)", m.ChoiceType, len(m.Queue))
 
 	footerContent := hintStr
 	footerColor := lipgloss.Color("#585B70")
-	if m.ErrorMessage != "" {
-		footerContent = " " + m.ErrorMessage
-		footerColor = lipgloss.Color("#F38BA8")
+	if m.Flash != "" {
+		footerContent = m.Flash
+		footerColor = lipgloss.Color("#A6E3A1")
+		if m.FlashErr {
+			footerContent = "⚠ " + m.Flash
+			footerColor = lipgloss.Color("#F38BA8")
+		}
 	}
 
 	footer := lipgloss.NewStyle().
@@ -331,7 +324,7 @@ func (m Model) View() tea.View {
 		Align(lipgloss.Center).
 		Foreground(footerColor).
 		MarginTop(1).
-		Render(footerContent)
+		Render(safeTruncate(footerContent, m.Width-2))
 
 	// --- Assembly ---
 	var finalBlocks []string
@@ -349,8 +342,20 @@ func (m Model) View() tea.View {
 	finalBlocks = append(finalBlocks, footer)
 
 	finalUI := lipgloss.JoinVertical(lipgloss.Left, finalBlocks...)
+	content := appStyle.Render(lipgloss.Place(m.Width, m.Height, lipgloss.Left, lipgloss.Top, finalUI))
 
-	v := tea.NewView(appStyle.Render(lipgloss.Place(m.Width, m.Height, lipgloss.Left, lipgloss.Top, finalUI)))
+	if m.QueueOpen {
+		box := m.renderQueueOverlay()
+		x := max(0, (m.Width-lipgloss.Width(box))/2)
+		y := max(0, (m.Height-lipgloss.Height(box))/2)
+		content = lipgloss.NewCompositor(
+			lipgloss.NewLayer(content),
+			lipgloss.NewLayer(box).X(x).Y(y).Z(1),
+		).Render()
+	}
+
+	v := tea.NewView(content)
 	v.AltScreen = true
+	v.ReportFocus = true
 	return v
 }

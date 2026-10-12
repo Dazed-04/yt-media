@@ -19,7 +19,7 @@ import (
 type (
 	blinkMsg       struct{}
 	spinnerTickMsg struct{}
-	errorClearMsg  struct{}
+	flashClearMsg  struct{ seq int }
 )
 
 type previewRenderedMsg struct {
@@ -44,6 +44,15 @@ func renderPreviewCmd(videoID, imagePath string, cols, rows int) tea.Cmd {
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
+		if msg.String() == "ctrl+c" {
+			m.Cleanup()
+			return m, tea.Quit
+		}
+		if m.QueueOpen {
+			return m.handleQueueKey(msg)
+		}
+
+		// ---- typing a search query ----
 		if m.Searching {
 			switch msg.String() {
 			case "enter":
@@ -53,12 +62,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.Searching = false
 				m.IsFetching = true
 				m.SpinnerIdx = 0
-
 				if m.DownloadState == StatusDone {
 					m.DownloadState = StatusIdle
 					m.purgePreviewCache()
 				}
-
 				return m, tea.Batch(m.doSearch(), tickSpinner(), m.showCachedPreview())
 			case "esc":
 				m.Searching = false
@@ -74,24 +81,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.SearchQuery += msg.String()
 				}
 			}
-			m.FilteredList = m.MusicList
-			if m.SearchQuery != "" {
-				query := strings.ToLower(m.SearchQuery)
-				var filtered []downloader.Video
-				for _, item := range m.MusicList {
-					if strings.Contains(strings.ToLower(item.Title), query) || strings.Contains(strings.ToLower(item.Artist), query) {
-						filtered = append(filtered, item)
-					}
-				}
-				m.FilteredList = filtered
-			}
+			m.FilterList() // from components.go
 			m.Cursor = 0
 			m.ListOffset = 0
 			return m, nil
 		}
 
+		// ---- browsing results ----
 		switch msg.String() {
-		case "ctrl+c", "q":
+		case "q":
 			m.Cleanup()
 			return m, tea.Quit
 
@@ -101,6 +99,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Tick(time.Millisecond*500, func(t time.Time) tea.Msg {
 				return blinkMsg{}
 			})
+
+		case "w":
+			m.QueueOpen = true
+			if m.QueueCursor >= len(m.Queue) {
+				m.QueueCursor = max(0, len(m.Queue)-1)
+			}
+			return m, nil
 
 		case "tab":
 			if m.ChoiceType == "Audio" {
@@ -135,15 +140,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "esc":
 			if m.DownloadState == StatusDone {
 				m.DownloadState = StatusIdle
-				m.Jobs = nil
+				m.resetBatch()
 			}
 			m.resetInFlight()
 			m.SearchQuery = ""
 			m.FilteredList = m.MusicList
-			m.ErrorMessage = ""
+			m.Flash = ""
 			m.Cursor = 0
 			m.ListOffset = 0
-			m.Selected = make(map[int]string)
 			m.purgePreviewCache()
 			return m, m.showCachedPreview()
 
@@ -167,33 +171,43 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(m.FilteredList) == 0 {
 				return m, nil
 			}
-			if _, exists := m.Selected[m.Cursor]; exists {
-				delete(m.Selected, m.Cursor)
+			var flashCmd tea.Cmd
+			if m.toggleQueue(m.FilteredList[m.Cursor]) {
+				flashCmd = m.flash(fmt.Sprintf("Added to queue (%d)", len(m.Queue)), false)
 			} else {
-				m.Selected[m.Cursor] = m.ChoiceType
+				flashCmd = m.flash(fmt.Sprintf("Removed from queue (%d)", len(m.Queue)), false)
 			}
 			m.moveCursor(1)
-			v := m.FilteredList[m.Cursor]
-			return m, tea.Batch(m.showCachedPreview(), m.priorityFetchCmd(v), m.fetchSizeCmd(v, m.ChoiceType))
+			next := m.FilteredList[m.Cursor]
+			return m, tea.Batch(flashCmd, m.showCachedPreview(), m.priorityFetchCmd(next), m.fetchSizeCmd(next, m.ChoiceType))
 
 		case "enter":
 			if len(m.FilteredList) == 0 {
 				return m, nil
 			}
-			m.SkippedItems = nil
-			var toCheck []DownloadReq
-			if len(m.Selected) == 0 {
-				toCheck = append(toCheck, DownloadReq{Video: m.FilteredList[m.Cursor], Type: m.ChoiceType})
-			} else {
-				for i, v := range m.FilteredList {
-					if typ, ok := m.Selected[i]; ok {
-						toCheck = append(toCheck, DownloadReq{Video: v, Type: typ})
-					}
-				}
+			v := m.FilteredList[m.Cursor]
+			typ := m.ChoiceType
+			if i := m.queueIndex(v.ID); i >= 0 { // downloading directly, so take it out of the queue
+				typ = m.Queue[i].Type
+				m.removeFromQueue(i)
 			}
-			m.Selected = make(map[int]string)
-			return m, m.checkLibraryManual(toCheck)
+			m.SkippedItems = nil
+			return m, m.checkLibraryManual([]DownloadReq{{Video: v, Type: typ}})
 		}
+
+	case tea.FocusMsg:
+		m.Focused = true
+		return m, nil
+
+	case tea.BlurMsg:
+		m.Focused = false
+		return m, nil
+
+	case flashClearMsg:
+		if msg.seq == m.flashSeq {
+			m.Flash = ""
+		}
+		return m, nil
 
 	case tea.PasteMsg:
 		if !m.Searching {
@@ -308,83 +322,72 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.SkippedItems = msg.Skipped
 		m.resetInFlight()
 
-		if m.Jobs == nil {
-			m.Jobs = make([]DownloadJob, 0)
+		var flashCmd tea.Cmd
+		if len(msg.Skipped) > 0 {
+			flashCmd = m.flash(fmt.Sprintf("Skipped %d already downloaded", len(msg.Skipped)), false)
 		}
 
+		idle := m.DownloadState == StatusIdle || m.DownloadState == StatusDone
+		if idle {
+			m.resetBatch()
+		}
 		for _, req := range msg.ToDownload {
-			m.Jobs = append(m.Jobs, DownloadJob{
-				Req:    req,
-				Status: StatusPending,
-			})
+			m.Jobs = append(m.Jobs, DownloadJob{Req: req, Status: StatusPending})
 		}
-
 		m.TotalItems = len(m.Jobs)
+		m.persistQueue()
 
-		if len(m.Jobs) == 0 {
-			if m.TotalItems == 0 {
-				m.DownloadState = StatusDone
+		if len(msg.ToDownload) == 0 {
+			if len(m.Jobs) == 0 && m.DownloadState != StatusIdle {
+				m.DownloadState = StatusIdle
 				m.purgePreviewCache()
-				return m, m.showCachedPreview()
+				return m, tea.Batch(flashCmd, m.showCachedPreview())
 			}
-			return m, nil
+			return m, flashCmd
 		}
 
-		if m.DownloadState == StatusIdle || m.DownloadState == StatusDone {
+		if idle {
 			m.DownloadState = StatusDownloading
 			m.purgePreviewCache()
 			m.ProgressChan = make(chan JobProgressMsg, 500)
-			return m, tea.Batch(m.startWorkerQueue(), waitForProgress(m.ProgressChan), m.showCachedPreview())
+			return m, tea.Batch(flashCmd, m.startWorkerQueue(), waitForProgress(m.ProgressChan), m.showCachedPreview())
 		}
-
-		return m, m.startWorkerQueue()
+		return m, tea.Batch(flashCmd, m.startWorkerQueue())
 
 	case JobProgressMsg:
-		m.Jobs[msg.Index].Progress = msg.Progress
+		if msg.Index < len(m.Jobs) {
+			m.Jobs[msg.Index].Progress = msg.Progress
+		}
 		return m, waitForProgress(m.ProgressChan)
 
 	case downloadFinishedMsg:
 		m.ActiveWorkers--
+		var flashCmd tea.Cmd
 		if msg.Err != nil {
 			log.Printf("Download job %d failed: %v", msg.Index, msg.Err)
 			m.Jobs[msg.Index].Status = StatusError
 			m.Jobs[msg.Index].Err = msg.Err
+			title := safeTruncate(m.Jobs[msg.Index].Req.Video.Title, 30)
+			flashCmd = m.flash(fmt.Sprintf("Failed: %s - %v", title, msg.Err), true)
 		} else {
 			m.Jobs[msg.Index].Status = StatusDone
 			m.Jobs[msg.Index].Progress = 1.0
 		}
+		m.persistQueue()
 
-		allDone := true
 		for _, job := range m.Jobs {
 			if job.Status == StatusPending || job.Status == StatusDownloading {
-				allDone = false
-				break
+				return m, tea.Batch(flashCmd, m.startWorkerQueue())
 			}
 		}
-
-		if allDone {
-			m.DownloadState = StatusDone
-			if m.Config.NotifyOnBatch && m.TotalItems >= m.Config.NotifyMinItems {
-				total := m.TotalItems
-				return m, func() tea.Msg {
-					notifyBatchComplete(total)
-					return nil
-				}
-			}
-			return m, nil
-		}
-		return m, m.startWorkerQueue()
+		m.DownloadState = StatusDone
+		return m, tea.Batch(flashCmd, m.batchFinishedCmd())
 
 	case errorMsg:
 		log.Printf("Caught error in TUI: %v", msg)
 		m.IsFetching = false
 		m.resetInFlight()
-		m.ErrorMessage = msg.Error()
-		return m, tea.Tick(time.Second*5, func(t time.Time) tea.Msg { return errorClearMsg{} })
-
-	case errorClearMsg:
-		m.ErrorMessage = ""
-		return m, nil
+		return m, m.flash(msg.Error(), true)
 
 	case previewRenderedMsg:
 		if m.inFlight != nil {
@@ -480,8 +483,8 @@ func (m *Model) fetchSizeCmd(v downloader.Video, format string) tea.Cmd {
 
 		sizeStr := "Unknown"
 		if err == nil {
-			lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-			for _, line := range lines {
+			lines := strings.SplitSeq(strings.TrimSpace(string(out)), "\n")
+			for line := range lines {
 				if line != "NA" && line != "" {
 					if bytes, err := strconv.ParseFloat(line, 64); err == nil {
 						sizeStr = fmt.Sprintf("%.1f MB", bytes/(1024*1024))

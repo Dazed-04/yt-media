@@ -1,3 +1,4 @@
+// Package tui
 package tui
 
 import (
@@ -84,7 +85,7 @@ func renderANSIPreview(img image.Image, cols, rows int) (renderedPreview, error)
 
 	var sb strings.Builder
 	for y := 0; y < targetH; y += 2 {
-		for x := 0; x < targetW; x++ {
+		for x := range targetW {
 			top := dst.RGBAAt(x, y)
 			bottom := dst.RGBAAt(x, y+1)
 			fmt.Fprintf(&sb, "\x1b[38;2;%d;%d;%dm\x1b[48;2;%d;%d;%dm▀",

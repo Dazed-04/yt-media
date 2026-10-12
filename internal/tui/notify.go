@@ -6,9 +6,12 @@ import (
 	"runtime"
 )
 
-func notifyBatchComplete(total int) {
+func notifyBatchComplete(ok, failed int) {
 	title := "Downloads complete"
-	body := fmt.Sprintf("%d items finished downloading", total)
+	body := fmt.Sprintf("%d downloaded", ok)
+	if failed > 0 {
+		body += fmt.Sprintf(", %d failed", failed)
+	}
 	if runtime.GOOS == "darwin" {
 		script := fmt.Sprintf(`display notification "%s" with title "%s"`, body, title)
 		_ = exec.Command("osascript", "-e", script).Run()

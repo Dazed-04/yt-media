@@ -1,3 +1,4 @@
+// Package config contains the config preferences for the tui
 package config
 
 import (
@@ -18,6 +19,7 @@ type Config struct {
 	FontShrinkDelta     float64 `json:"font_shrink_delta"`
 	NotifyOnBatch       bool    `json:"notify_on_batch"`
 	NotifyMinItems      int     `json:"notify_min_items"` // batch = queue size >= this
+	NotifyOnlyUnfocused bool    `json:"notify_only_unfocused"`
 }
 
 func defaults() Config {
@@ -27,7 +29,8 @@ func defaults() Config {
 		SearchResultLimit:   15,
 		FontShrinkDelta:     1.5,
 		NotifyOnBatch:       true,
-		NotifyMinItems:      2,
+		NotifyMinItems:      4,
+		NotifyOnlyUnfocused: true,
 	}
 }
 

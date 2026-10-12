@@ -129,7 +129,15 @@ func (m *Model) downloadItem(jobIndex int) tea.Cmd {
 			args = append(args, "bestvideo+bestaudio/best", "-o", outputPath)
 		}
 
-		args = append(args, "--embed-metadata", "--embed-thumbnail", "--newline", "--no-colors", "--download-archive", v.ID)
+		archivePath := m.archivePath()
+		args = append(args,
+			"--embed-metadata", "--embed-thumbnail",
+			"--newline",
+			"--download-archive", archivePath,
+			"--",
+			"https://www.youtube.com/watch?v="+v.ID,
+		)
+		log.Printf("[DL] yt-dlp %q", args)
 
 		cmd := exec.Command("yt-dlp", args...)
 		stdout, _ := cmd.StdoutPipe()
@@ -219,7 +227,7 @@ func loadArchiveIDs(path string) map[string]bool {
 	if err != nil {
 		return ids
 	}
-	for _, line := range strings.Split(string(data), "\n") {
+	for line := range strings.SplitSeq(string(data), "\n") {
 		if fields := strings.Fields(line); len(fields) == 2 {
 			ids[fields[1]] = true
 		}
