@@ -48,7 +48,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.Cleanup()
 			return m, tea.Quit
 		}
-		if m.QueueOpen {
+		if m.overlayOpen() {
+			if m.ErrorsOpen {
+				return m.handleErrorsKey(msg)
+			}
 			return m.handleQueueKey(msg)
 		}
 
@@ -101,10 +104,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			})
 
 		case "w":
-			m.QueueOpen = true
-			if m.QueueCursor >= len(m.Queue) {
-				m.QueueCursor = max(0, len(m.Queue)-1)
-			}
+			m.showQueue()
 			return m, nil
 
 		case "tab":
@@ -119,23 +119,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, sizeCmd
 
+		case "e":
+			m.showErrors()
+			return m, nil
+
 		case "r":
-			hadFailures := false
-			for i := range m.Jobs {
-				if m.Jobs[i].Status == StatusError {
-					m.Jobs[i].Status = StatusPending
-					m.Jobs[i].Err = nil
-					m.Jobs[i].Progress = 0
-					hadFailures = true
-				}
-			}
-			if !hadFailures {
-				return m, nil
-			}
-			if m.DownloadState == StatusDone {
-				m.DownloadState = StatusDownloading
-			}
-			return m, m.startWorkerQueue()
+			return m, m.retryFailed()
 
 		case "esc":
 			if m.DownloadState == StatusDone {
@@ -367,11 +356,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			log.Printf("Download job %d failed: %v", msg.Index, msg.Err)
 			m.Jobs[msg.Index].Status = StatusError
 			m.Jobs[msg.Index].Err = msg.Err
+			m.recordFailure(m.Jobs[msg.Index].Req, msg.Err, msg.Detail)
 			title := safeTruncate(m.Jobs[msg.Index].Req.Video.Title, 30)
-			flashCmd = m.flash(fmt.Sprintf("Failed: %s - %v", title, msg.Err), true)
+			flashCmd = m.flash(fmt.Sprintf("Failed: %s - %v (e: details)", title, msg.Err), true)
 		} else {
 			m.Jobs[msg.Index].Status = StatusDone
 			m.Jobs[msg.Index].Progress = 1.0
+			m.clearFailure(m.Jobs[msg.Index].Req.Video.ID)
 		}
 		m.persistQueue()
 

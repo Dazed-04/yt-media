@@ -96,8 +96,12 @@ type Model struct {
 	Height          int
 	fontShrinkDelta float64
 
-	ready bool
-	Err   error
+	ready         bool
+	Err           error
+	ErrorExpanded bool
+	ErrorsOpen    bool
+	ErrorCursor   int
+	Failed        []FailedItem
 }
 
 func InitialModel(cfg config.Config) *Model {
@@ -105,6 +109,7 @@ func InitialModel(cfg config.Config) *Model {
 	if err != nil {
 		log.Fatal("Could not get current user")
 	}
+	queue, failed := loadQueue()
 	return &Model{
 		Config:          cfg,
 		ChoiceType:      cfg.DefaultDownloadType,
@@ -112,7 +117,8 @@ func InitialModel(cfg config.Config) *Model {
 		Searching:       true,
 		Blink:           true,
 		Focused:         true,
-		Queue:           loadQueue(),
+		Queue:           queue,
+		Failed:          failed,
 		FilteredList:    []downloader.Video{},
 		SizeCache:       make(map[string]string),
 		SizeInFlight:    make(map[string]bool),
@@ -127,8 +133,8 @@ func (m *Model) Init() tea.Cmd {
 	log.Println("[SYS] Initializing TUI Session")
 	shrinkKittyFont(m.fontShrinkDelta)
 	cmds := []tea.Cmd{func() tea.Msg { return blinkMsg{} }}
-	if n := len(m.Queue); n > 0 {
-		cmds = append(cmds, m.flash(fmt.Sprintf("Restored %d queued item(s) - press w to view", n), false))
+	if n := len(m.Queue) + len(m.Failed); n > 0 {
+		cmds = append(cmds, m.flash(fmt.Sprintf("Restored %d item(s) - w: queue, e: errors", n), false))
 	}
 	return tea.Batch(cmds...)
 }
@@ -150,10 +156,7 @@ func (m *Model) moveCursor(delta int) {
 	}
 	m.Cursor = ((m.Cursor+delta)%n + n) % n
 
-	visible := m.VisibleListH
-	if visible > n {
-		visible = n
-	}
+	visible := min(m.VisibleListH, n)
 	visibleIndex := ((m.Cursor-m.ListOffset)%n + n) % n
 	if visibleIndex >= visible {
 		if delta > 0 {
@@ -165,10 +168,7 @@ func (m *Model) moveCursor(delta int) {
 }
 
 func (m *Model) previewImageDims() (cols, rows int) {
-	cols = m.Width - 8
-	if cols < 4 {
-		cols = 4
-	}
+	cols = max(m.Width-8, 4)
 
 	headerH := 4 // Header margin + border + content
 	footerH := 2 // Hint line margin + content

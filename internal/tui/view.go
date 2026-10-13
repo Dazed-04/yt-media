@@ -306,7 +306,7 @@ func (m Model) View() tea.View {
 	}
 
 	// --- 5. Footer (Hints) ---
-	hintStr := fmt.Sprintf("(esc: reset • /: search • tab: default %s • space: queue • w: queue [%d] • enter: download • r: retry failed)", m.ChoiceType, len(m.Queue))
+	hintStr := fmt.Sprintf("(esc: reset • /: search • tab: default %s • space: queue • w: queue [%d] • e: errors [%d] • enter: download • r: retry)", m.ChoiceType, len(m.Queue), len(m.Failed))
 
 	footerContent := hintStr
 	footerColor := lipgloss.Color("#585B70")
@@ -344,8 +344,11 @@ func (m Model) View() tea.View {
 	finalUI := lipgloss.JoinVertical(lipgloss.Left, finalBlocks...)
 	content := appStyle.Render(lipgloss.Place(m.Width, m.Height, lipgloss.Left, lipgloss.Top, finalUI))
 
-	if m.QueueOpen {
+	if m.overlayOpen() {
 		box := m.renderQueueOverlay()
+		if m.ErrorsOpen {
+			box = m.renderErrorsOverlay()
+		}
 		x := max(0, (m.Width-lipgloss.Width(box))/2)
 		y := max(0, (m.Height-lipgloss.Height(box))/2)
 		content = lipgloss.NewCompositor(

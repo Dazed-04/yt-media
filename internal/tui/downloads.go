@@ -2,12 +2,16 @@ package tui
 
 import (
 	"bufio"
+	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -19,8 +23,9 @@ import (
 
 type (
 	downloadFinishedMsg struct {
-		Index int
-		Err   error
+		Index  int
+		Err    error
+		Detail string
 	}
 	searchResultsMsg  []downloader.Video
 	errorMsg          error
@@ -84,25 +89,32 @@ func (m *Model) doSearch() tea.Cmd {
 }
 
 func (m *Model) downloadItem(jobIndex int) tea.Cmd {
+	req := m.Jobs[jobIndex].Req
+	cfg := m.Config
+	mode := m.ChoiceMode
+	home := m.User
+	archivePath := m.archivePath()
+	progress := m.ProgressChan
+
 	return func() tea.Msg {
-		req := m.Jobs[jobIndex].Req
 		v := req.Video
 
-		musicRoot := m.Config.MusicDir
+		musicRoot := cfg.MusicDir
 		if musicRoot == "" {
-			musicRoot = filepath.Join(m.User, "Music")
+			musicRoot = filepath.Join(home, "Music")
 		}
-		videoRoot := m.Config.VideoDir
+		videoRoot := cfg.VideoDir
 		if videoRoot == "" {
-			videoRoot = filepath.Join(m.User, "Videos")
+			videoRoot = filepath.Join(home, "Videos")
+		}
+		root := musicRoot
+		if req.Type == "Video" {
+			root = videoRoot
 		}
 
 		var baseDir string
-		if m.ChoiceMode == "Single" {
-			baseDir = filepath.Join(musicRoot, "single")
-			if req.Type == "Video" {
-				baseDir = filepath.Join(videoRoot, "single")
-			}
+		if mode == "Single" {
+			baseDir = filepath.Join(root, "single")
 		} else {
 			artist := sanitize(v.Artist)
 			if artist == "" {
@@ -112,11 +124,7 @@ func (m *Model) downloadItem(jobIndex int) tea.Cmd {
 			if album == "" {
 				album = "Playlist"
 			}
-			dirName := fmt.Sprintf("%s - %s", artist, album)
-			baseDir = filepath.Join(musicRoot, dirName)
-			if req.Type == "Video" {
-				baseDir = filepath.Join(videoRoot, dirName)
-			}
+			baseDir = filepath.Join(root, fmt.Sprintf("%s - %s", artist, album))
 		}
 
 		_ = os.MkdirAll(baseDir, 0o755)
@@ -129,7 +137,6 @@ func (m *Model) downloadItem(jobIndex int) tea.Cmd {
 			args = append(args, "bestvideo+bestaudio/best", "-o", outputPath)
 		}
 
-		archivePath := m.archivePath()
 		args = append(args,
 			"--embed-metadata", "--embed-thumbnail",
 			"--newline",
@@ -140,8 +147,13 @@ func (m *Model) downloadItem(jobIndex int) tea.Cmd {
 		log.Printf("[DL] yt-dlp %q", args)
 
 		cmd := exec.Command("yt-dlp", args...)
-		stdout, _ := cmd.StdoutPipe()
-		cmd.Stderr = log.Writer()
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			return downloadFinishedMsg{Index: jobIndex, Err: err}
+		}
+
+		var stderr bytes.Buffer
+		cmd.Stderr = io.MultiWriter(log.Writer(), &stderr)
 
 		if err := cmd.Start(); err != nil {
 			return downloadFinishedMsg{Index: jobIndex, Err: err}
@@ -153,14 +165,22 @@ func (m *Model) downloadItem(jobIndex int) tea.Cmd {
 			matches := progressRe.FindStringSubmatch(line)
 			if len(matches) == 2 {
 				if p, err := strconv.ParseFloat(matches[1], 64); err == nil {
-					m.ProgressChan <- JobProgressMsg{Index: jobIndex, Progress: p / 100.0}
+					progress <- JobProgressMsg{Index: jobIndex, Progress: p / 100.0}
 				}
 			}
 		}
 
-		err := cmd.Wait()
-		m.ProgressChan <- JobProgressMsg{Index: jobIndex, Progress: 1.0}
-		return downloadFinishedMsg{Index: jobIndex, Err: err}
+		err = cmd.Wait()
+
+		var detail string
+		if err != nil {
+			var short string
+			short, detail = parseYtdlpError(stderr.String(), err)
+			err = errors.New(short)
+		} else {
+			progress <- JobProgressMsg{Index: jobIndex, Progress: 1.0}
+		}
+		return downloadFinishedMsg{Index: jobIndex, Err: err, Detail: detail}
 	}
 }
 
@@ -249,4 +269,34 @@ func (m *Model) checkLibraryManual(items []DownloadReq) tea.Cmd {
 		}
 		return checkLibraryMsg{ToDownload: toDownload, Skipped: skipped}
 	}
+}
+
+func lastErrLine(stderr string, fallback error) string {
+	lines := strings.Split(strings.TrimSpace(stderr), "\n")
+	for _, line := range slices.Backward(lines) {
+		if l := strings.TrimSpace(line); l != "" {
+			return strings.TrimPrefix(l, "ERROR: ")
+		}
+	}
+	return fallback.Error()
+}
+
+func parseYtdlpError(stderr string, fallback error) (short, detail string) {
+	var lines []string
+	for _, l := range strings.Split(stderr, "\n") {
+		if l = strings.TrimSpace(l); l != "" {
+			lines = append(lines, l)
+		}
+	}
+	short = fallback.Error()
+	for i := len(lines) - 1; i >= 0; i-- { // last ERROR:, not last line (a WARNING can trail it)
+		if strings.HasPrefix(lines[i], "ERROR:") {
+			short = strings.TrimSpace(strings.TrimPrefix(lines[i], "ERROR:"))
+			break
+		}
+	}
+	if len(lines) > 12 {
+		lines = lines[len(lines)-12:]
+	}
+	return short, strings.Join(lines, "\n")
 }
