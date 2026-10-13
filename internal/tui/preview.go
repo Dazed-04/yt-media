@@ -66,11 +66,13 @@ func downloadThumbnailTo(url, dest string) error {
 	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
 		return err
 	}
-	tmp := dest + ".part"
-	f, err := os.Create(tmp)
+	// Unique temp name: the background prefetch and the cursor fetch can be
+	// downloading the same thumbnail at the same moment.
+	f, err := os.CreateTemp(filepath.Dir(dest), filepath.Base(dest)+".*.part")
 	if err != nil {
 		return err
 	}
+	tmp := f.Name()
 	if _, err := io.Copy(f, resp.Body); err != nil {
 		f.Close()
 		_ = os.Remove(tmp)
@@ -95,12 +97,15 @@ func fetchOneThumbnail(videos []downloader.Video, idx, gen int) tea.Cmd {
 	return func() tea.Msg {
 		dest := thumbCachePath(v.ID)
 		if _, err := os.Stat(dest); err == nil {
+			log.Printf("[THUMB] prefetch #%d %s: already on disk (cursor fetch got there first)", idx, v.ID)
 			return thumbnailReadyMsg{videoID: v.ID, gen: gen}
 		}
+		start := time.Now()
 		if err := downloadThumbnailTo(thumbURL(v), dest); err != nil {
 			// fall back to a URL guaranteed to exist
 			_ = downloadThumbnailTo("https://i.ytimg.com/vi/"+v.ID+"/hqdefault.jpg", dest)
 		}
+		log.Printf("[THUMB] prefetch #%d %s: downloaded in %s", idx, v.ID, time.Since(start).Round(time.Millisecond))
 		return thumbnailReadyMsg{videoID: v.ID, gen: gen}
 	}
 }
@@ -160,14 +165,15 @@ func (m *Model) showCachedPreview() tea.Cmd {
 // priorityFetchCmd downloads and renders the highlighted item's thumbnail
 // right away instead of waiting for the background prefetch to reach it.
 func (m *Model) priorityFetchCmd(v downloader.Video) tea.Cmd {
-	url := v.ThumbnailURL()
-	if url == "" || m.inFlight[v.ID] {
+	if m.inFlight[v.ID] {
 		return nil
 	}
 	dest := thumbCachePath(v.ID)
 	if _, err := os.Stat(dest); err == nil {
-		return nil
+		return nil // already prefetched
 	}
+	log.Printf("[THUMB] cursor fetch %s: not prefetched yet", v.ID)
+	url := thumbURL(v) // same URL (and quality) the prefetch would use
 	if m.inFlight == nil {
 		m.inFlight = make(map[string]bool)
 	}
