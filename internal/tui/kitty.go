@@ -59,7 +59,7 @@ var kittyDiacritics = []rune{
 	'\U0001D242', '\U0001D243', '\U0001D244',
 }
 
-var kittyImageIDCounter uint32
+var kittyImageIDCounter atomic.Uint32
 
 // kittySupported reports whether the current terminal understands the Kitty
 // graphics protocol. Checked per-call; it's just two env reads.
@@ -74,14 +74,14 @@ func kittySupported() bool {
 // nextKittyImageID hands out a fresh id in [1, 0xFFFFFF] (24 bits, since the
 // id is smuggled through a placeholder cell's foreground color).
 func nextKittyImageID() uint32 {
-	id := atomic.AddUint32(&kittyImageIDCounter, 1)
+	id := kittyImageIDCounter.Add(1)
 	return (id % 0xFFFFFE) + 1
 }
 
-// deleteKittyImage tells the terminal to forget an image and its placements.
-// Safe to call from inside Update() — see note in model.go.
-func deleteKittyImage(id uint32) {
-	fmt.Fprintf(os.Stdout, "\x1b_Ga=d,d=I,i=%d,q=2\x1b\\", id)
+// kittyDeleteSeq returns the escape sequence that makes the terminal forget
+// an image and its placements. Queue it in m.rawOut; Update sends it.
+func kittyDeleteSeq(id uint32) string {
+	return fmt.Sprintf("\x1b_Ga=d,d=I,i=%d,q=2\x1b\\", id)
 }
 
 // deleteAllKittyImages wipes every image this program has uploaded. Call on
@@ -144,8 +144,8 @@ func kittyPlaceholderGrid(id uint32, cols, rows int) string {
 
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "\x1b[38;2;%d;%d;%dm", r, g, b)
-	for y := 0; y < rows; y++ {
-		for x := 0; x < cols; x++ {
+	for y := range rows {
+		for x := range cols {
 			sb.WriteRune(kittyPlaceholderChar)
 			sb.WriteRune(dia(y))
 			sb.WriteRune(dia(x))

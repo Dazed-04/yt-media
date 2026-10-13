@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/user"
+	"time"
 
 	"yt-downloader/internal/config"
 	"yt-downloader/internal/downloader"
@@ -12,78 +13,46 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-type DownloadStatus int
-
-const (
-	StatusIdle DownloadStatus = iota
-	StatusPending
-	StatusDownloading
-	StatusDone
-	StatusError
-)
-
-type DownloadReq struct {
-	Video downloader.Video
-	Type  string
-}
-
-type DownloadJob struct {
-	Req      DownloadReq
-	Status   DownloadStatus
-	Progress float64
-	Err      error
-}
-
-type JobProgressMsg struct {
-	Index    int
-	Progress float64
-}
-
-type sizeFetchedMsg struct {
-	videoID string
-	format  string
-	sizeStr string
-}
-
+// Model is the whole application state. It is only ever touched from
+// Update/View. Anything run in a tea.Cmd goroutine must work on copies taken
+// before the command is returned (see downloadItem, doSearch).
 type Model struct {
 	Config     config.Config
-	ChoiceType string
-	ChoiceMode string
+	ChoiceType string // "Audio" | "Video": default type for new downloads
+	ChoiceMode string // "Single" | other: where downloads are filed
+	User       string // home directory
 
-	Searching  bool
-	IsFetching bool
-	SpinnerIdx int
-	Blink      bool
-	User       string
-
+	// Search + results
+	Searching    bool
+	IsFetching   bool
+	SpinnerIdx   int
+	Blink        bool
 	MusicList    []downloader.Video
 	FilteredList []downloader.Video
 	SearchQuery  string
 	Cursor       int
 	ListOffset   int
-	VisibleListH int
 	SkippedItems []string
+
+	// Previews and sizes
 	previewCache map[string]renderedPreview
 	inFlight     map[string]bool
-
-	// Download queue (persisted to disk between runs)
-	Queue       []DownloadReq
-	QueueOpen   bool
-	QueueCursor int
-
-	Focused bool // terminal focus, from tea.FocusMsg / tea.BlurMsg
-
-	Flash    string // transient footer message
-	FlashErr bool
-	flashSeq int
-
-	// Caching for Async Size Fetching
+	prefetchList []downloader.Video
+	prefetchIdx  int
+	prefetchGen  int
 	SizeCache    map[string]string
 	SizeInFlight map[string]bool
 
-	prefetchList []downloader.Video
-	prefetchIdx  int
+	// Download queue + failures (persisted to disk between runs)
+	Queue         []DownloadReq
+	Failed        []FailedItem
+	QueueOpen     bool
+	QueueCursor   int // one cursor over failed items, then staged items
+	ErrorsOpen    bool
+	ErrorCursor   int
+	ErrorExpanded bool
 
+	// Active batch
 	DownloadState   DownloadStatus
 	Jobs            []DownloadJob
 	ActiveWorkers   int
@@ -92,16 +61,23 @@ type Model struct {
 	TotalItems      int
 	TotalDownloaded int
 
+	// Terminal
 	Width           int
 	Height          int
+	Focused         bool // from tea.FocusMsg / tea.BlurMsg
 	fontShrinkDelta float64
+	ready           bool
 
-	ready         bool
-	Err           error
-	ErrorExpanded bool
-	ErrorsOpen    bool
-	ErrorCursor   int
-	Failed        []FailedItem
+	// Terminal escape sequences waiting to be sent through Bubble Tea's
+	// output buffer (see Update). Never write them to os.Stdout directly.
+	rawOut []string
+
+	// Transient footer message
+	Flash    string
+	FlashErr bool
+	flashSeq int
+
+	Err error
 }
 
 func InitialModel(cfg config.Config) *Model {
@@ -139,16 +115,34 @@ func (m *Model) Init() tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+// Cleanup restores the terminal and removes temporary files. Call it before
+// quitting.
 func (m *Model) Cleanup() {
 	m.persistQueue()
 	restoreKittyFont(m.fontShrinkDelta)
 	deleteAllKittyImages()
-	dir := thumbCacheDir()
-	if err := os.RemoveAll(dir); err != nil {
+	if err := os.RemoveAll(thumbCacheDir()); err != nil {
 		log.Printf("[CLEANUP] failed to remove thumb cache: %v", err)
 	}
 }
 
+func (m *Model) quit() (tea.Model, tea.Cmd) {
+	m.Cleanup()
+	return m, tea.Quit
+}
+
+// ---------- selection ----------
+
+// current returns the highlighted result, if there is one.
+func (m *Model) current() (downloader.Video, bool) {
+	if m.Cursor < 0 || m.Cursor >= len(m.FilteredList) {
+		return downloader.Video{}, false
+	}
+	return m.FilteredList[m.Cursor], true
+}
+
+// moveCursor moves the highlight by delta, wrapping at both ends, and keeps
+// the rolling list window around it.
 func (m *Model) moveCursor(delta int) {
 	n := len(m.FilteredList)
 	if n == 0 {
@@ -156,7 +150,7 @@ func (m *Model) moveCursor(delta int) {
 	}
 	m.Cursor = ((m.Cursor+delta)%n + n) % n
 
-	visible := min(m.VisibleListH, n)
+	visible := min(m.listHeight(), n)
 	visibleIndex := ((m.Cursor-m.ListOffset)%n + n) % n
 	if visibleIndex >= visible {
 		if delta > 0 {
@@ -167,54 +161,14 @@ func (m *Model) moveCursor(delta int) {
 	}
 }
 
-func (m *Model) previewImageDims() (cols, rows int) {
-	cols = max(m.Width-8, 4)
+// ---------- footer flash messages ----------
 
-	headerH := 4 // Header margin + border + content
-	footerH := 2 // Hint line margin + content
-	progressH := 0
-	if m.DownloadState != StatusIdle {
-		progressH = 3 // Progress margin + border + content
-	}
-	artBorders := 2 // Top and bottom borders of the art box
-	bottomBordersH := 2
-
-	const idealListH = 13
-	const minListH = 4
-	const minArtRows = 4
-
-	fixedOverhead := headerH + artBorders + footerH + progressH
-
-	m.VisibleListH = idealListH
-	for m.VisibleListH > 0 {
-		rows = m.Height - fixedOverhead - (m.VisibleListH + bottomBordersH)
-		if rows >= minArtRows {
-			break
-		}
-		m.VisibleListH--
-	}
-
-	if m.VisibleListH < minListH {
-		m.VisibleListH = 0
-		rows = m.Height - fixedOverhead
-	}
-
-	if rows < minArtRows {
-		rows = minArtRows
-	}
-	return
-}
-
-func (m *Model) resetInFlight() {
-	m.inFlight = nil
-}
-
-func (m *Model) purgePreviewCache() {
-	for _, pv := range m.previewCache {
-		if pv.kittyID != 0 {
-			deleteKittyImage(pv.kittyID)
-		}
-	}
-	m.previewCache = nil
-	m.inFlight = nil
+// flash shows text in the footer for a few seconds.
+func (m *Model) flash(text string, isErr bool) tea.Cmd {
+	m.Flash, m.FlashErr = text, isErr
+	m.flashSeq++
+	seq := m.flashSeq
+	return tea.Tick(4*time.Second, func(time.Time) tea.Msg {
+		return flashClearMsg{seq: seq}
+	})
 }

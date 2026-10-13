@@ -102,7 +102,8 @@ const defaultTemplate = `{
   // Desktop notification when a download queue finishes. Only fires for
   // batches (queue size >= notify_min_items), never single downloads.
   "notify_on_batch": true,
-  "notify_min_items": 2
+  "notify_min_items": 4,
+	"notify_only_unfocused": true
 }
 `
 
