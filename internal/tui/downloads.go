@@ -3,6 +3,7 @@ package tui
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -13,8 +14,10 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-
+	"time"
 	"yt-downloader/internal/config"
+	"yt-downloader/internal/downloader"
+	"yt-downloader/internal/lyrics"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -54,6 +57,9 @@ type downloadParams struct {
 	home     string
 	archive  string
 	progress chan<- JobProgressMsg
+
+	fetchLyrics bool
+	lyrics      lyrics.Options
 }
 
 func (m *Model) downloadItem(jobIndex int) tea.Cmd {
@@ -65,6 +71,9 @@ func (m *Model) downloadItem(jobIndex int) tea.Cmd {
 		home:     m.User,
 		archive:  m.archivePath(),
 		progress: m.ProgressChan,
+
+		fetchLyrics: m.Config.FetchLyrics,
+		lyrics:      lyrics.FromConfig(m.Config, m.User),
 	}
 	return func() tea.Msg { return p.run() }
 }
@@ -83,9 +92,15 @@ func (p downloadParams) outputDir() string {
 	return filepath.Join(root, fmt.Sprintf("%s - %s", artist, album))
 }
 
+// wantsLyrics reports whether this download should get lyrics afterwards.
+func (p downloadParams) wantsLyrics() bool {
+	return p.fetchLyrics && (p.req.Type == "Audio" || p.lyrics.VideoSRT)
+}
+
 // args builds the yt-dlp command line. The URL goes after "--" so it can
-// never be read as an option value.
-func (p downloadParams) args(dir string) []string {
+// never be read as an option value. When pathFile is set, yt-dlp also writes
+// the final file path into it (needed to attach lyrics to the right file).
+func (p downloadParams) args(dir, pathFile string) []string {
 	out := filepath.Join(dir, "%(title)s.%(ext)s")
 
 	var args []string
@@ -93,6 +108,9 @@ func (p downloadParams) args(dir string) []string {
 		args = []string{"-f", "bestaudio/best", "-o", out, "--extract-audio", "--audio-format", "mp3"}
 	} else {
 		args = []string{"-f", "bestvideo+bestaudio/best", "-o", out}
+	}
+	if pathFile != "" {
+		args = append(args, "--print-to-file", "after_move:filepath", pathFile)
 	}
 	return append(args,
 		"--embed-metadata", "--embed-thumbnail",
@@ -113,7 +131,16 @@ func (p downloadParams) run() downloadFinishedMsg {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fail(err)
 	}
-	args := p.args(dir)
+
+	var pathFile string
+	if p.wantsLyrics() {
+		if f, err := os.CreateTemp("", "yt-media-path-*.txt"); err == nil {
+			pathFile = f.Name()
+			f.Close()
+			defer os.Remove(pathFile)
+		}
+	}
+	args := p.args(dir, pathFile)
 	log.Printf("[DL] yt-dlp %q", args)
 
 	cmd := exec.Command("yt-dlp", args...)
@@ -144,7 +171,60 @@ func (p downloadParams) run() downloadFinishedMsg {
 		return downloadFinishedMsg{Index: p.index, Err: errors.New(short), Detail: detail}
 	}
 	p.progress <- JobProgressMsg{Index: p.index, Progress: 1.0}
-	return downloadFinishedMsg{Index: p.index}
+
+	missing := false
+	if pathFile != "" {
+		missing = p.saveLyrics(pathFile)
+	}
+	return downloadFinishedMsg{Index: p.index, LyricsMissing: missing}
+}
+
+// saveLyrics looks up lyrics for the file yt-dlp just wrote. It never fails
+// the download: the outcome is logged, and the result is true only when no
+// lyrics exist for the song (so the UI can say so).
+func (p downloadParams) saveLyrics(pathFile string) (missing bool) {
+	data, err := os.ReadFile(pathFile)
+	if err != nil {
+		return false
+	}
+	var media string
+	for line := range strings.SplitSeq(string(data), "\n") {
+		if l := strings.TrimSpace(line); l != "" {
+			media = l
+		}
+	}
+	if media == "" {
+		log.Printf("[LYRICS] yt-dlp didn't report the output file for %s", p.req.Video.ID)
+		return false
+	}
+
+	kind := lyrics.Audio
+	if p.req.Type == "Video" {
+		kind = lyrics.Video
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	res := lyrics.Ensure(ctx, p.lyrics, kind, media, trackFromVideo(p.req.Video))
+	if res.Err != nil {
+		log.Printf("[LYRICS] %s: %s: %v", filepath.Base(media), res.Outcome, res.Err)
+	} else {
+		log.Printf("[LYRICS] %s: %s", filepath.Base(media), res.Outcome)
+	}
+	return res.Outcome == lyrics.NotFound
+}
+
+// trackFromVideo turns YouTube metadata into what the lyrics lookup needs.
+// When YouTube has proper music metadata ("track"), that is the title and the
+// video title is kept as a second spelling to try.
+func trackFromVideo(v downloader.Video) lyrics.Track {
+	t := lyrics.Track{Artist: v.Artist, Album: v.Album, Duration: lyrics.ParseClock(v.Duration)}
+	if v.Track != "" {
+		t.Title, t.AltTitle = v.Track, v.Title
+	} else {
+		t.Title = v.Title
+	}
+	return t
 }
 
 var nonAlnumRe = regexp.MustCompile(`[^a-z0-9\s]+`)
@@ -310,6 +390,9 @@ func (m *Model) onDownloadFinished(msg downloadFinishedMsg) tea.Cmd {
 		job.Status = StatusDone
 		job.Progress = 1.0
 		m.clearFailure(job.Req.Video.ID)
+		if msg.LyricsMissing {
+			flashCmd = m.flash("No lyrics found: "+safeTruncate(job.Req.Video.Title, 40), false)
+		}
 	}
 	m.persistQueue()
 

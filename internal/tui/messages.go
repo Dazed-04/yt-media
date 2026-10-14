@@ -64,5 +64,7 @@ type (
 		Index  int
 		Err    error
 		Detail string // tail of yt-dlp's stderr, shown in the error window
+
+		LyricsMissing bool // downloaded fine, but no synced lyrics exist for it
 	}
 )

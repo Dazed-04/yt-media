@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-
 	"yt-downloader/internal/config"
 	"yt-downloader/internal/tui"
 

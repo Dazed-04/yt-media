@@ -20,6 +20,12 @@ type Config struct {
 	NotifyOnBatch       bool    `json:"notify_on_batch"`
 	NotifyMinItems      int     `json:"notify_min_items"` // batch = queue size >= this
 	NotifyOnlyUnfocused bool    `json:"notify_only_unfocused"`
+
+	FetchLyrics           bool     `json:"fetch_lyrics"`            // look up lyrics after each download
+	LyricsDir             string   `json:"lyrics_dir"`              // blank = <music_dir>/lyrics
+	LyricsExclude         []string `json:"lyrics_exclude"`          // paths (relative to music_dir) to skip
+	LyricsForVideo        bool     `json:"lyrics_for_video"`        // write .srt subtitles next to videos
+	LyricsFallbackCommand string   `json:"lyrics_fallback_command"` // optional, tried when LRCLIB has nothing
 }
 
 func defaults() Config {
@@ -31,6 +37,7 @@ func defaults() Config {
 		NotifyOnBatch:       true,
 		NotifyMinItems:      4,
 		NotifyOnlyUnfocused: true,
+		FetchLyrics:         true,
 	}
 }
 
@@ -103,7 +110,28 @@ const defaultTemplate = `{
   // batches (queue size >= notify_min_items), never single downloads.
   "notify_on_batch": true,
   "notify_min_items": 4,
-	"notify_only_unfocused": true
+
+  // Only notify when the terminal isn't focused.
+  "notify_only_unfocused": true,
+
+  // Look up synced lyrics (LRCLIB) after each audio download and save them
+  // as .lrc files. "yt-media lyrics" does the same for your whole library.
+  "fetch_lyrics": true,
+
+  // Where .lrc files go. Blank = a "lyrics" folder inside music_dir, mirroring
+  // its folder structure.
+  "lyrics_dir": "",
+
+  // Paths (relative to music_dir) to skip, matched as prefixes.
+  "lyrics_exclude": [],
+
+  // Also write .srt subtitles next to downloaded videos (when they have none).
+  "lyrics_for_video": false,
+
+  // Optional: a command to try when LRCLIB has nothing. {query} and {output}
+  // are replaced; no shell is used. Example:
+  //   "syncedlyrics {query} -o {output} --synced-only -p musixmatch"
+  "lyrics_fallback_command": ""
 }
 `
 
