@@ -11,7 +11,15 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
+// version is set at build time: -ldflags "-X main.version=1.2.3" (the release
+// build does this). A plain "go build" reports "dev".
+var version = "dev"
+
 func main() {
+	if len(os.Args) == 2 && (os.Args[1] == "version" || os.Args[1] == "--version") {
+		fmt.Println("yt-media", version)
+		return
+	}
 	// Any argument means "run a command and print to the terminal"; only a
 	// bare "yt-media" opens the UI. Unknown commands are an error rather than
 	// silently opening the UI.

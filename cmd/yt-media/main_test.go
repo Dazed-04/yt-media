@@ -107,3 +107,18 @@ func TestAlbumFileWithAlbumTag(t *testing.T) {
 		t.Errorf("scan: %d %q", code, out)
 	}
 }
+
+func TestVersionFlagIsInjectable(t *testing.T) {
+	if _, err := exec.LookPath("go"); err != nil {
+		t.Skip("no go tool")
+	}
+	bin := filepath.Join(t.TempDir(), "yt-media")
+	build := exec.Command("go", "build", "-ldflags", "-X main.version=9.9.9", "-o", bin, ".")
+	if out, err := build.CombinedOutput(); err != nil {
+		t.Skipf("can't build here: %v\n%s", err, out)
+	}
+	out, err := exec.Command(bin, "version").Output()
+	if err != nil || strings.TrimSpace(string(out)) != "yt-media 9.9.9" {
+		t.Errorf("version output = %q, %v", out, err)
+	}
+}
