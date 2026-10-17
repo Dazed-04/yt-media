@@ -2,13 +2,12 @@ package lyrics
 
 import (
 	"context"
-	"io/fs"
-	"path/filepath"
-	"strings"
+	"errors"
+	"fmt"
 	"sync"
+	"yt-downloader/internal/media"
+	"yt-downloader/internal/netutil"
 )
-
-var audioExts = map[string]bool{".mp3": true, ".flac": true, ".m4a": true, ".opus": true, ".ogg": true}
 
 // Event reports one file finished during a Scan.
 type Event struct {
@@ -22,29 +21,23 @@ type Summary struct {
 	Total, Saved, Exists, Excluded, Embedded, NotFound, Failed int
 }
 
+// giveUpAfter is how many files in a row may fail because LRCLIB keeps
+// refusing requests before the scan stops instead of hammering it.
+const giveUpAfter = 4
+
 // Scan fetches lyrics for every audio file in the library that doesn't have
 // them yet, with a few lookups running at once. on (optional) is called once
 // per file, never concurrently.
 func Scan(ctx context.Context, o Options, workers int, on func(Event)) (Summary, error) {
-	var files []string
-	err := filepath.WalkDir(o.MusicDir, func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			if p != o.MusicDir && filepath.Clean(p) == filepath.Clean(o.LyricsDir) {
-				return filepath.SkipDir // don't scan the lyrics folder itself
-			}
-			return nil
-		}
-		if audioExts[strings.ToLower(filepath.Ext(p))] {
-			files = append(files, p)
-		}
-		return nil
-	})
+	files, err := media.AudioFiles(o.MusicDir, o.LyricsDir) // the lyrics folder isn't scanned
 	if err != nil {
 		return Summary{}, err
 	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	var stopErr error
+	refused := 0
 
 	sum := Summary{Total: len(files)}
 	jobs := make(chan string)
@@ -60,6 +53,10 @@ func Scan(ctx context.Context, o Options, workers int, on func(Event)) (Summary,
 				res := Ensure(ctx, o, Audio, p, Track{})
 
 				mu.Lock()
+				if stopErr != nil { // another worker gave up; this result is just the cancellation
+					mu.Unlock()
+					continue
+				}
 				done++
 				switch res.Outcome {
 				case Saved:
@@ -78,6 +75,14 @@ func Scan(ctx context.Context, o Options, workers int, on func(Event)) (Summary,
 				if on != nil {
 					on(Event{Path: p, Result: res, Done: done, Total: sum.Total})
 				}
+				if res.Outcome == Failed && errors.Is(res.Err, netutil.ErrRateLimited) {
+					if refused++; refused >= giveUpAfter {
+						stopErr = fmt.Errorf("LRCLIB keeps refusing requests, stopping (run it again later; finished songs are skipped): %w", res.Err)
+						cancel()
+					}
+				} else {
+					refused = 0
+				}
 				mu.Unlock()
 			}
 		}()
@@ -93,5 +98,8 @@ feed:
 	}
 	close(jobs)
 	wg.Wait()
+	if stopErr != nil {
+		return sum, stopErr
+	}
 	return sum, ctx.Err()
 }

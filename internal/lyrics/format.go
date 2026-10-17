@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode"
+	"yt-downloader/internal/songname"
 )
 
 var (
@@ -119,14 +121,25 @@ func srtTime(sec float64) string {
 
 // ParseClock turns "3:45" or "1:02:03" (yt-dlp's duration_string) into seconds.
 // It returns 0 for anything it can't read.
-func ParseClock(s string) float64 {
-	total := 0.0
-	for _, part := range strings.Split(strings.TrimSpace(s), ":") {
-		v, err := strconv.ParseFloat(part, 64)
-		if err != nil {
-			return 0
+func ParseClock(s string) float64 { return songname.ParseClock(s) }
+
+var (
+	lrcTagRe = regexp.MustCompile(`\[[A-Za-z]{2,8}:[^\]]*\]`) // [ar:..] [al:..] [ti:..]
+	lrcTSRe  = regexp.MustCompile(`\[\d+:\d+(?:[.:]\d+)?\]`)  // [00:12.50]
+)
+
+// IsPlaceholder reports whether an .lrc holds no lyrics at all: only tags and
+// timestamps followed by nothing, spinner characters (braille patterns) or a
+// music note. Player scripts write such files so a failed lookup isn't retried
+// on every play; for us they are "no lyrics yet", not "has lyrics".
+func IsPlaceholder(lrc string) bool {
+	lrc = strings.ReplaceAll(lrc, `\n`, "\n") // an unexpanded "\n" between tags
+	lrc = lrcTagRe.ReplaceAllString(lrc, "")
+	lrc = lrcTSRe.ReplaceAllString(lrc, "")
+	for _, r := range lrc {
+		if !unicode.IsSpace(r) && !(r >= 0x2800 && r <= 0x28FF) && r != '🎵' {
+			return false
 		}
-		total = total*60 + v
 	}
-	return total
+	return true
 }

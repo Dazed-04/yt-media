@@ -15,9 +15,11 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"yt-downloader/internal/album"
 	"yt-downloader/internal/config"
 	"yt-downloader/internal/downloader"
 	"yt-downloader/internal/lyrics"
+	"yt-downloader/internal/songname"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -53,12 +55,12 @@ type downloadParams struct {
 	index    int
 	req      DownloadReq
 	cfg      config.Config
-	mode     string // m.ChoiceMode
 	home     string
 	archive  string
 	progress chan<- JobProgressMsg
 
 	fetchLyrics bool
+	fetchAlbum  bool
 	lyrics      lyrics.Options
 }
 
@@ -67,29 +69,92 @@ func (m *Model) downloadItem(jobIndex int) tea.Cmd {
 		index:    jobIndex,
 		req:      m.Jobs[jobIndex].Req,
 		cfg:      m.Config,
-		mode:     m.ChoiceMode,
 		home:     m.User,
 		archive:  m.archivePath(),
 		progress: m.ProgressChan,
 
 		fetchLyrics: m.Config.FetchLyrics,
+		fetchAlbum:  m.Config.FetchAlbum,
 		lyrics:      lyrics.FromConfig(m.Config, m.User),
 	}
+	p.lyrics.Exclude = m.Config.LyricsExclusions()
 	return func() tea.Msg { return p.run() }
 }
 
-// outputDir is where this download is filed.
-func (p downloadParams) outputDir() string {
-	root := firstNonEmpty(p.cfg.MusicDir, filepath.Join(p.home, "Music"))
+// unknownAlbum is the folder for songs whose album can't be found.
+const unknownAlbum = "Unknown Album"
+
+// outputDir is where this download is filed: music_dir/Artist/Album for
+// audio, video_dir/Artist for video. albumName is the album already worked out
+// by resolveAlbum ("" = none known).
+func (p downloadParams) outputDir(albumName string) string {
+	artist := folderName(artistFolder(p.req.Video), "Unknown Artist")
 	if p.req.Type == "Video" {
-		root = firstNonEmpty(p.cfg.VideoDir, filepath.Join(p.home, "Videos"))
+		root := firstNonEmpty(p.cfg.VideoDir, filepath.Join(p.home, "Videos"))
+		return filepath.Join(root, artist)
 	}
-	if p.mode == "Single" {
-		return filepath.Join(root, "single")
+	root := firstNonEmpty(p.cfg.MusicDir, filepath.Join(p.home, "Music"))
+	return filepath.Join(root, artist, folderName(albumName, unknownAlbum))
+}
+
+// artistFolder picks the folder name for the artist: the first credited
+// artist, so "A, B & C" and "A" end up together.
+func artistFolder(v downloader.Video) string {
+	t := trackFromVideo(v)
+	for _, a := range songname.KnownArtists(t) {
+		if a != "" {
+			return a
+		}
 	}
-	artist := firstNonEmpty(sanitize(p.req.Video.Artist), "Unknown")
-	album := firstNonEmpty(sanitize(p.req.Video.Album), "Playlist")
-	return filepath.Join(root, fmt.Sprintf("%s - %s", artist, album))
+	return songname.PrimaryArtist(songname.CleanArtist(firstNonEmpty(v.Artist, v.Channel, v.Uploader)))
+}
+
+// resolveAlbum works out the album before the download starts, because it
+// decides the folder. YouTube's own album wins; otherwise MusicBrainz is asked
+// (if fetch_album is on). It returns "" when nothing is found, and never fails
+// the download.
+func (p downloadParams) resolveAlbum() string {
+	if p.req.Type != "Audio" {
+		return ""
+	}
+	if album.IsValid(p.req.Video.Album) {
+		return strings.TrimSpace(p.req.Video.Album)
+	}
+	if !p.fetchAlbum {
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	name, err := album.Find(ctx, trackFromVideo(p.req.Video))
+	switch {
+	case err == nil:
+		return name
+	case errors.Is(err, album.ErrNotFound):
+		log.Printf("[ALBUM] %s: no album found", p.req.Video.GetDisplayString())
+	default:
+		log.Printf("[ALBUM] %s: lookup failed: %v", p.req.Video.GetDisplayString(), err)
+	}
+	return ""
+}
+
+var (
+	badNameRe = regexp.MustCompile(`[<>:"|?*\x00-\x1f]`)
+	spacesRe  = regexp.MustCompile(`\s+`)
+)
+
+// folderName makes s safe to use as one folder or file name, keeping its
+// capitalisation. fallback is used when nothing usable is left.
+func folderName(s, fallback string) string {
+	s = strings.NewReplacer("/", "_", "\\", "_").Replace(s)
+	s = badNameRe.ReplaceAllString(s, "")
+	s = strings.Trim(spacesRe.ReplaceAllString(s, " "), " .")
+	if r := []rune(s); len(r) > 100 {
+		s = strings.TrimRight(string(r[:100]), " .")
+	}
+	if s == "" {
+		return fallback
+	}
+	return s
 }
 
 // wantsLyrics reports whether this download should get lyrics afterwards.
@@ -97,11 +162,27 @@ func (p downloadParams) wantsLyrics() bool {
 	return p.fetchLyrics && (p.req.Type == "Audio" || p.lyrics.VideoSRT)
 }
 
+// musicRoot is the library folder; exclusions are relative to it.
+func (p downloadParams) musicRoot() string {
+	return firstNonEmpty(p.cfg.MusicDir, filepath.Join(p.home, "Music"))
+}
+
+// wantsAlbum reports whether the album should be looked up afterwards.
+func (p downloadParams) wantsAlbum() bool {
+	return p.fetchAlbum && p.req.Type == "Audio"
+}
+
 // args builds the yt-dlp command line. The URL goes after "--" so it can
 // never be read as an option value. When pathFile is set, yt-dlp also writes
 // the final file path into it (needed to attach lyrics to the right file).
 func (p downloadParams) args(dir, pathFile string) []string {
-	out := filepath.Join(dir, "%(title)s.%(ext)s")
+	// A song with proper music metadata is named after its track; anything
+	// else after the video title. "%" must be doubled in a yt-dlp template.
+	name := "%(title)s"
+	if t := folderName(p.req.Video.Track, ""); t != "" {
+		name = strings.ReplaceAll(t, "%", "%%")
+	}
+	out := filepath.Join(dir, name+".%(ext)s")
 
 	var args []string
 	if p.req.Type == "Audio" {
@@ -127,13 +208,14 @@ func (p downloadParams) run() downloadFinishedMsg {
 		return downloadFinishedMsg{Index: p.index, Err: err}
 	}
 
-	dir := p.outputDir()
+	albumName := p.resolveAlbum()
+	dir := p.outputDir(albumName)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fail(err)
 	}
 
 	var pathFile string
-	if p.wantsLyrics() {
+	if p.wantsLyrics() || p.wantsAlbum() {
 		if f, err := os.CreateTemp("", "yt-media-path-*.txt"); err == nil {
 			pathFile = f.Name()
 			f.Close()
@@ -174,15 +256,16 @@ func (p downloadParams) run() downloadFinishedMsg {
 
 	missing := false
 	if pathFile != "" {
-		missing = p.saveLyrics(pathFile)
+		missing = p.postProcess(pathFile, albumName)
 	}
 	return downloadFinishedMsg{Index: p.index, LyricsMissing: missing}
 }
 
-// saveLyrics looks up lyrics for the file yt-dlp just wrote. It never fails
-// the download: the outcome is logged, and the result is true only when no
-// lyrics exist for the song (so the UI can say so).
-func (p downloadParams) saveLyrics(pathFile string) (missing bool) {
+// postProcess does the optional extras for the file yt-dlp just wrote: fills in
+// a missing album tag and fetches lyrics. Neither can fail the download: the
+// outcome is logged, and the result is true only when no lyrics exist for the
+// song (so the UI can say so).
+func (p downloadParams) postProcess(pathFile, albumName string) (missing bool) {
 	data, err := os.ReadFile(pathFile)
 	if err != nil {
 		return false
@@ -194,7 +277,24 @@ func (p downloadParams) saveLyrics(pathFile string) (missing bool) {
 		}
 	}
 	if media == "" {
-		log.Printf("[LYRICS] yt-dlp didn't report the output file for %s", p.req.Video.ID)
+		log.Printf("[POST] yt-dlp didn't report the output file for %s", p.req.Video.ID)
+		return false
+	}
+	track := trackFromVideo(p.req.Video)
+
+	// Write the album into the tags (the folder was chosen from it). A file
+	// that already carries a real album from YouTube is left alone.
+	if albumName != "" && p.wantsAlbum() && !album.Excluded(p.musicRoot(), media, p.cfg.AlbumExclusions()) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		res := album.Apply(ctx, media, albumName)
+		cancel()
+		if res.Err != nil {
+			log.Printf("[ALBUM] %s: %s: %v", filepath.Base(media), res.Outcome, res.Err)
+		} else {
+			log.Printf("[ALBUM] %s: %s %s", filepath.Base(media), res.Outcome, res.Album)
+		}
+	}
+	if !p.wantsLyrics() {
 		return false
 	}
 
@@ -205,7 +305,7 @@ func (p downloadParams) saveLyrics(pathFile string) (missing bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	res := lyrics.Ensure(ctx, p.lyrics, kind, media, trackFromVideo(p.req.Video))
+	res := lyrics.Ensure(ctx, p.lyrics, kind, media, track)
 	if res.Err != nil {
 		log.Printf("[LYRICS] %s: %s: %v", filepath.Base(media), res.Outcome, res.Err)
 	} else {

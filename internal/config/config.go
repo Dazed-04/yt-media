@@ -21,9 +21,13 @@ type Config struct {
 	NotifyMinItems      int     `json:"notify_min_items"` // batch = queue size >= this
 	NotifyOnlyUnfocused bool    `json:"notify_only_unfocused"`
 
+	FetchAlbum   bool     `json:"fetch_album"`   // look up the real album (MusicBrainz) for tracks that have none
+	AlbumExclude []string `json:"album_exclude"` // paths skipped only by album tagger
+
 	FetchLyrics           bool     `json:"fetch_lyrics"`            // look up lyrics after each download
 	LyricsDir             string   `json:"lyrics_dir"`              // blank = <music_dir>/lyrics
-	LyricsExclude         []string `json:"lyrics_exclude"`          // paths (relative to music_dir) to skip
+	LyricsExclude         []string `json:"lyrics_exclude"`          // paths skipped only by lyrics tagger
+	MusicExclude          []string `json:"music_excluse"`           // paths (relative to music_dir) to skip for album & lyrics
 	LyricsForVideo        bool     `json:"lyrics_for_video"`        // write .srt subtitles next to videos
 	LyricsFallbackCommand string   `json:"lyrics_fallback_command"` // optional, tried when LRCLIB has nothing
 }
@@ -38,8 +42,23 @@ func defaults() Config {
 		NotifyMinItems:      4,
 		NotifyOnlyUnfocused: true,
 		FetchLyrics:         true,
+		FetchAlbum:          true,
 	}
 }
+
+// CacheDir is the one folder for everything the app generates: the queue,
+// thumbnails and debug.log (~/.cache/yt-media, or $XDG_CACHE_HOME/yt-media).
+func CacheDir() string {
+	dir, err := os.UserCacheDir()
+	if err != nil || dir == "" {
+		home, _ := os.UserHomeDir()
+		dir = filepath.Join(home, ".cache")
+	}
+	return filepath.Join(dir, "yt-media")
+}
+
+// LogPath is the debug log, next to the other cache files.
+func LogPath() string { return filepath.Join(CacheDir(), "debug.log") }
 
 func Path() string {
 	dir, err := os.UserConfigDir()
@@ -114,6 +133,11 @@ const defaultTemplate = `{
   // Only notify when the terminal isn't focused.
   "notify_only_unfocused": true,
 
+  // YouTube often has no album for a song, so it would show as "Unknown
+  // Album". When true, the album is looked up on MusicBrainz after each audio
+  // download and written into the file's tags (only if the file has none).
+  "fetch_album": true,
+
   // Look up synced lyrics (LRCLIB) after each audio download and save them
   // as .lrc files. "yt-media lyrics" does the same for your whole library.
   "fetch_lyrics": true,
@@ -122,18 +146,34 @@ const defaultTemplate = `{
   // its folder structure.
   "lyrics_dir": "",
 
-  // Paths (relative to music_dir) to skip, matched as prefixes.
-  "lyrics_exclude": [],
-
-  // Also write .srt subtitles next to downloaded videos (when they have none).
+	// Also write .srt subtitles next to downloaded videos (when they have none).
   "lyrics_for_video": false,
 
   // Optional: a command to try when LRCLIB has nothing. {query} and {output}
   // are replaced; no shell is used. Example:
   //   "syncedlyrics {query} -o {output} --synced-only -p musixmatch"
-  "lyrics_fallback_command": ""
+  "lyrics_fallback_command": "",
+
+	// Paths (relative to music_dir) to skip for ALL operations (lyrics and album).
+  "music_exclude": [],
+
+  // Paths to skip exclusively during album tagging.
+  "album_exclude": [],
+
+  // Paths to skip exclusively during lyrics fetching.
+  "lyrics_exclude": []
 }
 `
+
+// AlbumExclusions returns merged paths skipped during album scanning.
+func (c Config) AlbumExclusions() []string {
+	return append(append([]string{}, c.MusicExclude...), c.AlbumExclude...)
+}
+
+// LyricsExclusions returns merged paths skipped during lyrics scanning.
+func (c Config) LyricsExclusions() []string {
+	return append(append([]string{}, c.MusicExclude...), c.LyricsExclude...)
+}
 
 func writeDefault(path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

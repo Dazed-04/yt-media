@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
+	"yt-downloader/internal/config"
 	"yt-downloader/internal/downloader"
 
 	tea "charm.land/bubbletea/v2"
@@ -18,11 +18,7 @@ import (
 // ---------- thumbnail cache on disk ----------
 
 func thumbCacheDir() string {
-	dir, err := os.UserCacheDir()
-	if err != nil || dir == "" {
-		dir = filepath.Join(os.Getenv("HOME"), ".cache")
-	}
-	return filepath.Join(dir, "yt-media", "thumbs")
+	return filepath.Join(config.CacheDir(), "thumbs")
 }
 
 func thumbCachePath(id string) string {

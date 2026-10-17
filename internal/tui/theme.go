@@ -17,4 +17,7 @@ var (
 
 	// Background of the popup windows (see overlay.go).
 	colWinBG = lipgloss.Color("#181825")
+	// colWinFrame is the overlay frame. It is drawn with half-block glyphs that sit
+	// on the outer edge of the cell, so the window ends exactly at its border.
+	colWinFrame = lipgloss.Color("#6c7a9c")
 )

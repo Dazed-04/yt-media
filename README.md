@@ -20,7 +20,7 @@ Search by name, paste a raw video URL, preview the thumbnail in full quality (on
 - **Skip what you already have** — downloads are tracked in a yt-dlp archive file by video ID, so re-running a search you've already downloaded from won't re-fetch anything.
 - **Desktop notifications** — get notified when a _batch_ finishes. Only for batches above a configurable size, and (by default) only when the terminal isn't focused.
 - **Synced lyrics** — after each audio download, matching lyrics are fetched from [LRCLIB](https://lrclib.net) and saved as `.lrc` files for players like `rmpc`/`mpd` clients. A single command fetches them for your whole existing library. See [Lyrics](#lyrics).
-- **Readable errors** — "Network unavailable" instead of `exit status 1`; the full output is always in `debug.log`.
+- **Readable errors** — "Network unavailable" instead of `exit status 1`; the full output is always in `~/.cache/yt-media/debug.log`.
 - **Config file, not recompiling** — worker count, default download type, output folders, notification behavior, and more all live in one JSON file.
 
 ## Requirements
@@ -34,7 +34,7 @@ Search by name, paste a raw video URL, preview the thumbnail in full quality (on
 ## Installation
 
 ```sh
-git clone https://github.com/Dazed-04/yt-media.git
+git clone https://github.com/<your-username>/yt-media.git
 cd yt-media
 go build -o yt-media ./cmd/yt-media
 ./yt-media
@@ -87,6 +87,11 @@ On first run, a default config is written to:
   // Only notify when the terminal isn't focused.
   "notify_only_unfocused": true,
 
+  // YouTube often has no album for a song, so it would show as "Unknown
+  // Album". When true, the album is looked up on MusicBrainz after each audio
+  // download and written into the file's tags (only if the file has none).
+  "fetch_album": true,
+
   // Look up synced lyrics (LRCLIB) after each audio download and save them
   // as .lrc files. "yt-media lyrics" does the same for your whole library.
   "fetch_lyrics": true,
@@ -131,26 +136,47 @@ This is entirely optional — leaving it at `0` (or not enabling remote control)
 With `fetch_lyrics` on (the default), every finished **audio** download gets synced lyrics from [LRCLIB](https://lrclib.net), a free, open lyrics database. Nothing is added to the audio file itself: the lyrics are saved as a separate `.lrc` file, in `lyrics_dir`, mirroring your library's folder structure:
 
 ```
-~/Music/single/Artist - Song.mp3   →   ~/Music/lyrics/single/Artist - Song.lrc
+~/Music/Artist/Album/Song.mp3   →   ~/Music/lyrics/Artist/Album/Song.lrc
 ```
 
 - **Matching** — song titles are messy, so several spellings are tried: the title as-is, then without `(Official Video)`-style decoration, then without `feat.`/`ft.` credits, plus `Artist - Title` uploads are split apart. A result is only accepted if the artist matches and its length is within a few seconds of your file, so you don't get the lyrics of a live or extended version.
-- **Skipped automatically** — files that already have an `.lrc`, files that carry embedded lyrics, and anything under a `lyrics_exclude` path.
-- **Never blocks a download** — if lyrics can't be found you'll see a short "No lyrics found" note, and the download still counts as done. Details are in `debug.log`.
+- **Skipped automatically** — files that already have an `.lrc` with real lyrics (an `.lrc` holding only a spinner/🎵 placeholder from a failed lookup counts as missing and is retried), files that carry embedded lyrics, and anything under a `lyrics_exclude` path.
+- **Never blocks a download** — if lyrics can't be found you'll see a short "No lyrics found" note, and the download still counts as done. Details are in `~/.cache/yt-media/debug.log`.
 - **Videos** — set `lyrics_for_video` to also write a `.srt` subtitle file next to downloaded videos (players like mpv and VLC load it automatically). Videos that already have subtitles are skipped. Music videos often differ in length from the studio track, so expect fewer matches than for audio.
 - **Extra source** — `lyrics_fallback_command` runs your own command when LRCLIB has nothing, e.g. [`syncedlyrics`](https://github.com/moehmeni/syncedlyrics).
 
-### Songs you already have
+### Commands
+
+Commands print to the terminal and never open the interface; only a bare `yt-media` does.
 
 ```sh
-yt-media lyrics                      # scan music_dir
-yt-media lyrics --dir ~/Music/Rock   # scan a specific folder
+yt-media lyrics                      # fetch lyrics for everything in music_dir
+yt-media lyrics --dir ~/Music/Rock   # a specific folder
+yt-media lyrics --file song.mp3      # just one file (a quick way to try it)
 yt-media lyrics --workers 8          # more lookups at once (default 4)
+yt-media album                       # fill in missing album tags (see below)
+yt-media album --file song.mp3 -v    # try one file and show every search and why results were rejected
+yt-media paths                       # where the config, queue and log live
+yt-media help
 ```
 
-This walks your library (`.mp3`, `.flac`, `.m4a`, `.opus`, `.ogg`), fetches lyrics for everything that doesn't have them, and prints what it found. It is safe to re-run: finished songs are skipped, so only new songs and previous misses are looked up. `Ctrl+C` stops it cleanly.
+`lyrics` walks your library (`.mp3`, `.flac`, `.m4a`, `.opus`, `.ogg`), fetches lyrics for everything that doesn't have them, and prints one line per song plus a summary. It is safe to re-run: finished songs are skipped, so only new songs and previous misses are looked up. `Ctrl+C` stops it cleanly.
 
 If you use `rmpc`, point its lyrics directory at the same `lyrics_dir`.
+
+## Where files go
+
+Audio is filed as `music_dir/Artist/Album/Song.mp3`; videos as `video_dir/Artist/Song.ext`. The artist is the first credited artist, so "A, B & C" and "A" share a folder. The album comes from YouTube when it has one, otherwise from MusicBrainz (see below); songs whose album can't be found go to `Unknown Album`. Songs already in your library are never moved.
+
+## Album names
+
+YouTube usually doesn't know which album a song is on, so players show "Unknown Album". With `fetch_album` on (the default), after each audio download the album is looked up on [MusicBrainz](https://musicbrainz.org) and written into the file's tags. Only files with **no** album tag are touched, and cover art and other tags are kept.
+
+- The song must match by title and artist (and length, when known). If it was released both as a single and on an album, the original album wins; compilations and live albums are only used as a last resort.
+- Songs MusicBrainz doesn't know stay untagged, and are filed under `Unknown Album`.
+- Both LRCLIB and MusicBrainz limit how fast they can be asked. Requests are spaced out, "429/503 - slow down" answers are waited out (honouring `Retry-After`) and retried, and a scan stops with a clear message if a service keeps refusing; just run it again later, finished songs are skipped.
+- For songs you already have, run `yt-media album` (about one song per second, MusicBrainz's limit). If you use `mpd`, update its database afterwards (`mpc update`).
+- Before publishing your fork, set the `userAgent` in `internal/album/album.go` to your own repository URL; MusicBrainz asks apps to identify themselves.
 
 ## Keybindings
 
@@ -209,7 +235,7 @@ The list shows failed items first, then queued items, under a single cursor.
 
 - **`HTTP Error 403: Forbidden`** — YouTube changes often, and an outdated yt-dlp is the usual cause. Update it (`yt-dlp -U`, or through your package manager) and retry with `r`.
 - **"Network unavailable"** — yt-dlp couldn't reach YouTube. Check your connection and retry.
-- **Anything else** — open the error window (`e`) and press `enter` for the full yt-dlp output. Everything is also logged to `debug.log` in the directory you launched the app from.
+- **Anything else** — open the error window (`e`) and press `enter` for the full yt-dlp output. Everything is also logged to `~/.cache/yt-media/debug.log` (run `yt-media paths` to see it).
 
 ## License
 

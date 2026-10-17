@@ -219,8 +219,8 @@ func windowBox(s winStyles, w int, header string, sections [][]string, hintLines
 	return lipgloss.NewStyle().
 		Width(w).
 		Background(colWinBG).
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(colBlue).
+		Border(lipgloss.OuterHalfBlockBorder()).
+		BorderForeground(colWinFrame).
 		BorderBackground(colWinBG).
 		Padding(0, 1).
 		Render(strings.Join(lines, "\n"))

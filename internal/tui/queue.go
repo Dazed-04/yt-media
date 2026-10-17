@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-
+	"yt-downloader/internal/config"
 	"yt-downloader/internal/downloader"
 
 	tea "charm.land/bubbletea/v2"
@@ -28,11 +28,7 @@ type queueFile struct {
 }
 
 func queuePath() string {
-	dir, err := os.UserCacheDir()
-	if err != nil || dir == "" {
-		dir = filepath.Join(os.Getenv("HOME"), ".cache")
-	}
-	return filepath.Join(dir, "yt-media", "queue.json")
+	return filepath.Join(config.CacheDir(), "queue.json")
 }
 
 func loadQueue() ([]DownloadReq, []FailedItem) {

@@ -11,7 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode"
+	"yt-downloader/internal/netutil"
+	"yt-downloader/internal/songname"
 )
 
 // ErrNotFound means the service has no suitable synced lyrics.
@@ -27,6 +28,11 @@ var (
 	baseURL    = "https://lrclib.net"
 	httpClient = &http.Client{Timeout: 10 * time.Second}
 	userAgent  = "yt-media (terminal yt-dlp wrapper)"
+
+	// Requests from all workers are spaced out, and 429/503 answers are waited
+	// out and retried (see netutil.Do).
+	limiter = netutil.NewLimiter(350 * time.Millisecond)
+	retry   = netutil.Retry{Max: 4, Base: 2 * time.Second, MaxWait: 45 * time.Second}
 )
 
 // Match is lyrics found for a track.
@@ -46,14 +52,15 @@ type result struct {
 }
 
 func get(ctx context.Context, path string, params url.Values, out any) (found bool, err error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+path+"?"+params.Encode(), nil)
+	resp, err := netutil.Do(ctx, httpClient, limiter, retry, func() (*http.Request, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+path+"?"+params.Encode(), nil)
+		if err == nil {
+			req.Header.Set("User-Agent", userAgent)
+		}
+		return req, err
+	})
 	if err != nil {
-		return false, err
-	}
-	req.Header.Set("User-Agent", userAgent)
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return false, err
+		return false, fmt.Errorf("lrclib: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -69,14 +76,14 @@ func get(ctx context.Context, path string, params url.Values, out any) (found bo
 // Find looks for synced lyrics for t. It returns ErrNotFound when the service
 // has none, and any other error when the service couldn't be reached.
 func Find(ctx context.Context, t Track) (Match, error) {
-	titles := titleVariants(t)
+	titles := songname.TitleVariants(t)
 
 	// Exact lookup first: cheap and unambiguous when we know album and length.
 	if t.Album != "" && t.Duration > 0 && t.Artist != "" {
 		var r result
 		params := url.Values{
-			"artist_name": {cleanArtist(t.Artist)},
-			"track_name":  {stripNoise(t.Title)},
+			"artist_name": {songname.CleanArtist(t.Artist)},
+			"track_name":  {songname.StripNoise(t.Title)},
 			"album_name":  {t.Album},
 			"duration":    {strconv.Itoa(int(math.Round(t.Duration)))},
 		}
@@ -91,17 +98,9 @@ func Find(ctx context.Context, t Track) (Match, error) {
 
 	// A free-text search matches songs by title alone, so for it the artist is
 	// checked against what we know about the track.
-	var knownArtists []string
-	if a := primaryArtist(cleanArtist(t.Artist)); a != "" {
-		knownArtists = append(knownArtists, a)
-	}
-	for _, title := range []string{t.Title, t.AltTitle} {
-		if left, _, ok := splitArtistTitle(stripNoise(title)); ok {
-			knownArtists = append(knownArtists, primaryArtist(cleanArtist(left)))
-		}
-	}
+	knownArtists := songname.KnownArtists(t)
 
-	for _, q := range Candidates(t) {
+	for _, q := range songname.Candidates(t) {
 		artists := knownArtists
 		if q.Artist != "" {
 			artists = []string{q.Artist}
@@ -134,7 +133,7 @@ func usable(r result) bool {
 func pick(rs []result, artists, titles []string, duration float64) (result, bool) {
 	best, bestDiff := -1, math.MaxFloat64
 	for i, r := range rs {
-		if !usable(r) || !anyArtistMatches(artists, r.ArtistName) || !titleMatches(titles, r.TrackName) {
+		if !usable(r) || !songname.AnyArtistMatches(artists, r.ArtistName) || !songname.TitleMatches(titles, r.TrackName) {
 			continue
 		}
 		diff := 0.0
@@ -151,64 +150,4 @@ func pick(rs []result, artists, titles []string, duration float64) (result, bool
 		return result{}, false
 	}
 	return rs[best], true
-}
-
-// norm lowercases s and keeps only letters and digits.
-func norm(s string) string {
-	return strings.Map(func(r rune) rune {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) {
-			return unicode.ToLower(r)
-		}
-		return -1
-	}, s)
-}
-
-// anyArtistMatches is true when no artist is known, or one of them matches.
-func anyArtistMatches(wants []string, got string) bool {
-	if len(wants) == 0 {
-		return true
-	}
-	for _, w := range wants {
-		if artistMatches(w, got) {
-			return true
-		}
-	}
-	return false
-}
-
-func artistMatches(want, got string) bool {
-	if want == "" {
-		return true
-	}
-	nw, ng := norm(want), norm(got)
-	if nw == "" || ng == "" {
-		return false
-	}
-	if strings.Contains(ng, nw) || strings.Contains(nw, ng) {
-		return true
-	}
-	for _, w := range strings.Fields(strings.ToLower(want)) {
-		if nwd := norm(w); len(nwd) >= 3 && strings.Contains(ng, nwd) {
-			return true
-		}
-	}
-	return false
-}
-
-func titleMatches(wants []string, got string) bool {
-	ng := norm(got)
-	if ng == "" {
-		return false
-	}
-	for _, w := range wants {
-		nw := norm(w)
-		switch {
-		case nw == "":
-		case nw == ng:
-			return true
-		case len(nw) >= 4 && len(ng) >= 4 && (strings.Contains(ng, nw) || strings.Contains(nw, ng)):
-			return true
-		}
-	}
-	return false
 }

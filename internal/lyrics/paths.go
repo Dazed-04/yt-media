@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"yt-downloader/internal/config"
+	"yt-downloader/internal/songname"
 )
 
 // Options says where lyrics live and what to do.
@@ -19,10 +20,10 @@ type Options struct {
 // FromConfig builds Options from the user's config. home is the user's home
 // directory, used for the default music folder.
 func FromConfig(cfg config.Config, home string) Options {
-	music := firstNonEmpty(cfg.MusicDir, filepath.Join(home, "Music"))
+	music := songname.FirstNonEmpty(cfg.MusicDir, filepath.Join(home, "Music"))
 	return Options{
 		MusicDir:  music,
-		LyricsDir: firstNonEmpty(cfg.LyricsDir, filepath.Join(music, "lyrics")),
+		LyricsDir: songname.FirstNonEmpty(cfg.LyricsDir, filepath.Join(music, "lyrics")),
 		Exclude:   cfg.LyricsExclude,
 		VideoSRT:  cfg.LyricsForVideo,
 		Fallback:  cfg.LyricsFallbackCommand,

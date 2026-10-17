@@ -8,6 +8,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"yt-downloader/internal/media"
+	"yt-downloader/internal/songname"
 )
 
 // Kind is the type of media a file is.
@@ -42,36 +44,41 @@ type Result struct {
 	Err     error  // set for Failed
 }
 
-// Ensure makes sure media has lyrics: it does nothing if they already exist,
+// Ensure makes sure file has lyrics: it does nothing if they already exist,
 // otherwise looks them up and writes them.
 //
 // hint is what the caller knows about the song (e.g. from YouTube metadata);
 // gaps are filled from the file's own tags, then its name.
-func Ensure(ctx context.Context, o Options, kind Kind, media string, hint Track) Result {
+func Ensure(ctx context.Context, o Options, kind Kind, file string, hint Track) Result {
 	var target string
 	switch kind {
 	case Video:
 		if !o.VideoSRT {
 			return Result{Outcome: Disabled}
 		}
-		target = srtPath(media)
+		target = srtPath(file)
 	default:
-		if o.excluded(media) {
+		if o.excluded(file) {
 			return Result{Outcome: Excluded}
 		}
-		target = o.lrcPath(media)
+		target = o.lrcPath(file)
 	}
 	if exists(target) {
-		return Result{Outcome: Exists, Path: target}
+		// An .lrc that only holds a "no lyrics" placeholder (the spinner
+		// animation some player scripts write when a lookup fails) doesn't
+		// count: look again, and keep the placeholder if nothing turns up.
+		if kind == Video || !isPlaceholderFile(target) {
+			return Result{Outcome: Exists, Path: target}
+		}
 	}
 
 	// ffprobe failing (not installed, unreadable file) only costs us the
 	// "already embedded" check and the tags; carry on with what we have.
-	p, err := probeFile(ctx, media)
-	if err == nil && ((kind == Audio && p.hasLyrics) || (kind == Video && p.hasSubtitles)) {
+	p, err := media.Probe(ctx, file)
+	if err == nil && ((kind == Audio && p.HasLyrics) || (kind == Video && p.HasSubtitles)) {
 		return Result{Outcome: HasEmbedded}
 	}
-	track := merge(hint, p.track(media))
+	track := songname.Merge(hint, p.Track(file))
 
 	lrc, err := lookup(ctx, o, track)
 	if errors.Is(err, ErrNotFound) {
@@ -85,7 +92,7 @@ func Ensure(ctx context.Context, o Options, kind Kind, media string, hint Track)
 	if kind == Video {
 		data = LRCToSRT(lrc)
 	} else {
-		data = CleanLRC(lrc, firstNonEmpty(track.Artist, "Unknown"), firstNonEmpty(track.Title, "Unknown"))
+		data = CleanLRC(lrc, songname.FirstNonEmpty(track.Artist, "Unknown"), songname.FirstNonEmpty(track.Title, "Unknown"))
 	}
 	if data == "" {
 		return Result{Outcome: NotFound}
@@ -96,21 +103,29 @@ func Ensure(ctx context.Context, o Options, kind Kind, media string, hint Track)
 	return Result{Outcome: Saved, Path: target}
 }
 
-// lookup asks LRCLIB, then the optional fallback command.
+func isPlaceholderFile(path string) bool {
+	data, err := os.ReadFile(path)
+	return err == nil && IsPlaceholder(string(data))
+}
+
+// lookup asks LRCLIB, then the optional fallback command. The fallback also
+// runs when LRCLIB itself is unavailable (rate limited, down), since it is
+// another source. If it has nothing either, LRCLIB's own error is returned,
+// so a song that couldn't be checked isn't reported as "no lyrics exist".
 func lookup(ctx context.Context, o Options, t Track) (string, error) {
 	m, err := Find(ctx, t)
 	if err == nil {
 		return m.LRC, nil
 	}
-	if !errors.Is(err, ErrNotFound) {
-		return "", err
+	if ctx.Err() != nil {
+		return "", ctx.Err()
 	}
 	if strings.TrimSpace(o.Fallback) != "" {
 		if lrc, ferr := runFallback(ctx, o.Fallback, t); ferr == nil {
 			return lrc, nil
 		}
 	}
-	return "", ErrNotFound
+	return "", err
 }
 
 // runFallback runs a user-configured command that writes an .lrc file, for
@@ -132,7 +147,7 @@ func runFallback(ctx context.Context, cmdline string, t Track) (string, error) {
 	tmp.Close()
 	defer os.Remove(tmp.Name())
 
-	query := strings.TrimSpace(cleanArtist(t.Artist) + " " + stripFeat(stripNoise(firstNonEmpty(t.Title, t.AltTitle))))
+	query := strings.TrimSpace(songname.CleanArtist(t.Artist) + " " + songname.StripFeat(songname.StripNoise(songname.FirstNonEmpty(t.Title, t.AltTitle))))
 	args := make([]string, 0, len(fields)-1)
 	for _, f := range fields[1:] {
 		switch f {

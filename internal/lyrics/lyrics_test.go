@@ -10,65 +10,17 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
+	"yt-downloader/internal/netutil"
 )
 
-func TestCleaning(t *testing.T) {
-	cases := []struct{ in, noise, feat string }{
-		{"Song (Official Video)", "Song", "Song"},
-		{"Song [Lyrics]", "Song", "Song"},
-		{"Song (feat. Someone) (Official Music Video)", "Song (feat. Someone)", "Song"},
-		{"Song ft. Someone", "Song ft. Someone", "Song"},
-		{"Song - Official Lyric Video", "Song", "Song"},
-		{"Song (Live)", "Song (Live)", "Song (Live)"}, // a different version: keep
-		{"Stay (With You)", "Stay (With You)", "Stay"},
-	}
-	for _, c := range cases {
-		if got := stripNoise(c.in); got != c.noise {
-			t.Errorf("stripNoise(%q) = %q, want %q", c.in, got, c.noise)
-		}
-		if got := stripFeat(stripNoise(c.in)); got != c.feat {
-			t.Errorf("stripFeat(stripNoise(%q)) = %q, want %q", c.in, got, c.feat)
-		}
-	}
-	if got := cleanArtist("The Weeknd - Topic"); got != "The Weeknd" {
-		t.Errorf("cleanArtist = %q", got)
-	}
-	if got := cleanArtist("TaylorSwiftVEVO"); got != "TaylorSwift" {
-		t.Errorf("cleanArtist = %q", got)
-	}
-	if got := primaryArtist("A, B & C"); got != "A" {
-		t.Errorf("primaryArtist = %q", got)
-	}
-}
-
-func TestCandidates(t *testing.T) {
-	qs := Candidates(Track{Artist: "Taylor Swift", Title: "Taylor Swift - Love Story (feat. X) (Official Video)"})
-	has := func(a, title string) bool {
-		for _, q := range qs {
-			if q.Artist == a && q.Title == title {
-				return true
-			}
-		}
-		return false
-	}
-	if !has("Taylor Swift", "Love Story") {
-		t.Errorf("missing split artist/title query: %v", qs)
-	}
-	if !has("Taylor Swift", "Love Story (feat. X)") {
-		t.Errorf("missing with-feat query (some songs keep it): %v", qs)
-	}
-	if last := qs[len(qs)-1]; last.Artist != "" || last.Title != "Love Story" {
-		t.Errorf("last query should be a free-text title search, got %+v", last)
-	}
-	if len(qs) > maxQueries {
-		t.Errorf("%d queries, max is %d", len(qs), maxQueries)
-	}
-	// exact spelling is tried before cleaned ones
-	plain := Candidates(Track{Artist: "A", Title: "Song (feat. B)"})
-	if plain[0].Title != "Song (feat. B)" || plain[1].Title != "Song" {
-		t.Errorf("order wrong: %v", plain)
-	}
+// Tests run against local servers: no spacing, and short waits between retries.
+func TestMain(m *testing.M) {
+	limiter.SetInterval(0)
+	retry = netutil.Retry{Max: 2, Base: time.Millisecond}
+	os.Exit(m.Run())
 }
 
 func TestCleanLRC(t *testing.T) {
@@ -125,6 +77,7 @@ func TestPaths(t *testing.T) {
 // ---------- LRCLIB (fake server) ----------
 
 type fakeLib struct {
+	mu     sync.Mutex
 	songs  []result
 	status int
 	hits   int
@@ -133,7 +86,9 @@ type fakeLib struct {
 func (f *fakeLib) serve(t *testing.T) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		f.mu.Lock()
 		f.hits++
+		f.mu.Unlock()
 		if f.status != 0 {
 			w.WriteHeader(f.status)
 			return
@@ -199,8 +154,35 @@ func TestFindServiceDown(t *testing.T) {
 	if err == nil || errors.Is(err, ErrNotFound) {
 		t.Fatalf("err = %v, want a real error", err)
 	}
-	if lib.hits != 1 {
-		t.Errorf("made %d requests to a failing service, want 1", lib.hits)
+	if !errors.Is(err, netutil.ErrRateLimited) {
+		t.Errorf("err = %v, want it to say the service is busy", err)
+	}
+	if lib.hits != 3 { // the first try plus two retries, then it gives up on the whole song
+		t.Errorf("made %d requests to a failing service, want 3", lib.hits)
+	}
+}
+
+func TestFindRecoversFromRateLimit(t *testing.T) {
+	var mu sync.Mutex
+	hits := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		hits++
+		n := hits
+		mu.Unlock()
+		if n <= 2 {
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		json.NewEncoder(w).Encode([]result{{TrackName: "Song", ArtistName: "A", Duration: 100, SyncedLyrics: sample}})
+	}))
+	defer srv.Close()
+	old := baseURL
+	baseURL = srv.URL
+	defer func() { baseURL = old }()
+
+	if _, err := Find(context.Background(), Track{Artist: "A", Title: "Song"}); err != nil {
+		t.Fatalf("Find after two 429s: %v", err)
 	}
 }
 
@@ -325,5 +307,75 @@ func TestFallbackCommand(t *testing.T) {
 	data, _ := os.ReadFile(r.Path)
 	if !strings.Contains(string(data), "[00:09.00] Some Artist Some Title") {
 		t.Errorf("fallback output not used:\n%s", data)
+	}
+}
+
+// The fallback is another source, so it runs when LRCLIB is unavailable too,
+// not only when LRCLIB has nothing.
+func TestFallbackRunsWhenLRCLIBIsBusy(t *testing.T) {
+	lib := &fakeLib{status: 503}
+	lib.serve(t)
+	root := t.TempDir()
+	script := filepath.Join(root, "fake.sh")
+	os.WriteFile(script, []byte("#!/bin/sh\nprintf '[00:09.00] ok\\n' > \"$2\"\n"), 0o755)
+	o := Options{MusicDir: root, LyricsDir: filepath.Join(root, "lyrics"), Fallback: script + " {query} {output}"}
+	song := filepath.Join(root, "s.mp3")
+	makeMP3(t, song, "Some Artist", "Some Title")
+
+	if r := Ensure(context.Background(), o, Audio, song, Track{}); r.Outcome != Saved {
+		t.Fatalf("outcome = %v (%v)", r.Outcome, r.Err)
+	}
+
+	// and without a fallback the song is reported as failed, not "not found"
+	o.Fallback = ""
+	os.RemoveAll(filepath.Join(root, "lyrics"))
+	if r := Ensure(context.Background(), o, Audio, song, Track{}); r.Outcome != Failed {
+		t.Fatalf("outcome = %v, want failed", r.Outcome)
+	}
+}
+
+// Player scripts leave an .lrc holding only a spinner/"🎵" when a lookup
+// failed. That file must not stop us from looking again.
+func TestPlaceholderLRCIsReplaced(t *testing.T) {
+	lib := &fakeLib{songs: []result{{TrackName: "Blinding Lights", ArtistName: "The Weeknd", Duration: 200, SyncedLyrics: sample}}}
+	lib.serve(t)
+	root := t.TempDir()
+	o := Options{MusicDir: root, LyricsDir: filepath.Join(root, "lyrics")}
+	song := filepath.Join(root, "a.mp3")
+	makeMP3(t, song, "The Weeknd", "Blinding Lights")
+
+	lrc := o.lrcPath(song)
+	os.MkdirAll(filepath.Dir(lrc), 0o755)
+	os.WriteFile(lrc, []byte("[ar:The Weeknd]\n[00:00.00] \u280b\u2819\u2839\n[00:05.00] \u2838\n"), 0o644)
+
+	if r := Ensure(context.Background(), o, Audio, song, Track{}); r.Outcome != Saved {
+		t.Fatalf("outcome = %v (%v), want the placeholder replaced", r.Outcome, r.Err)
+	}
+	if data, _ := os.ReadFile(lrc); !strings.Contains(string(data), "hello") {
+		t.Errorf("placeholder still there:\n%s", data)
+	}
+
+	// real lyrics are never touched
+	lib.songs = nil
+	os.WriteFile(lrc, []byte("[00:10.00] real words\n"), 0o644)
+	if r := Ensure(context.Background(), o, Audio, song, Track{}); r.Outcome != Exists {
+		t.Fatalf("outcome = %v, want exists", r.Outcome)
+	}
+}
+
+func TestScanStopsWhenRefusedRepeatedly(t *testing.T) {
+	lib := &fakeLib{status: 429}
+	lib.serve(t)
+	root := t.TempDir()
+	for _, n := range []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"} {
+		makeMP3(t, filepath.Join(root, "Artist - Song "+n+".mp3"), "Artist", "Song "+n)
+	}
+	o := Options{MusicDir: root, LyricsDir: filepath.Join(root, "lyrics")}
+	sum, err := Scan(context.Background(), o, 2, nil)
+	if !errors.Is(err, netutil.ErrRateLimited) {
+		t.Fatalf("err = %v", err)
+	}
+	if sum.Failed < giveUpAfter || sum.Failed >= sum.Total {
+		t.Errorf("failed %d of %d: should stop early, after at least %d", sum.Failed, sum.Total, giveUpAfter)
 	}
 }
