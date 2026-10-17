@@ -34,10 +34,13 @@ Search by name, paste a raw video URL, preview the thumbnail in full quality (on
 ## Installation
 
 ```sh
-git clone https://github.com/<your-username>/yt-media.git
+git clone https://github.com/Dazed-04/yt-media.git
 cd yt-media
 go build -o yt-media ./cmd/yt-media
 ./yt-media
+# Or grab the prebuilt binary from the Releases page:
+curl -sL https://github.com/Dazed-04/yt-media/releases/latest/download/yt-media_<version>_<release>.tar.gz | tar -xzv
+
 ```
 
 Move the binary somewhere on your `PATH` (e.g. `~/.local/bin`) to launch it from anywhere. Rebuild and copy it again after pulling updates.
