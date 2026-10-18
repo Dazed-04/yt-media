@@ -12,7 +12,8 @@ Search by name, paste a raw video URL, preview the thumbnail in full quality (on
 
 ## Features
 
-- **Search or paste** — type a query to search YouTube, or paste a full video URL directly and it's fetched as a single item instead of a search.
+- **Search or paste** — type a query to search YouTube, or paste a full video URL directly and it's fetched as a single item instead of a search. Paste a playlist link and its tracks are loaded as the result list; `a` queues them all.
+- **Preview before downloading** — press `p` to listen to the highlighted track in a small in-app player (audio mode) or watch it in an `mpv` window (video mode). See [Preview](#preview).
 - **Real image previews** — thumbnails render as actual high-resolution images via the Kitty graphics protocol, with an ANSI half-block fallback for other terminals.
 - **Download queue** — stage items with `space`, then review and start them from a floating queue window (`w`). Each item keeps its own Audio/Video type, and the queue survives restarts.
 - **Concurrent batches** — queued items download together through a configurable worker pool, with a progress bar for the whole batch.
@@ -20,6 +21,7 @@ Search by name, paste a raw video URL, preview the thumbnail in full quality (on
 - **Skip what you already have** — downloads are tracked in a yt-dlp archive file by video ID, so re-running a search you've already downloaded from won't re-fetch anything.
 - **Desktop notifications** — get notified when a _batch_ finishes. Only for batches above a configurable size, and (by default) only when the terminal isn't focused.
 - **Synced lyrics** — after each audio download, matching lyrics are fetched from [LRCLIB](https://lrclib.net) and saved as `.lrc` files for players like `rmpc`/`mpd` clients. A single command fetches them for your whole existing library. See [Lyrics](#lyrics).
+- **Formats and options** — choose the audio format (mp3, opus, flac, m4a), cap video resolution, remove sponsor segments from music, and use your browser's cookies for age-restricted or rate-limited videos. See [Configuration](#configuration).
 - **Readable errors** — "Network unavailable" instead of `exit status 1`; the full output is always in `~/.cache/yt-media/debug.log`.
 - **Config file, not recompiling** — worker count, default download type, output folders, notification behavior, and more all live in one JSON file.
 
@@ -29,6 +31,8 @@ Search by name, paste a raw video URL, preview the thumbnail in full quality (on
 - [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) on your `PATH`
 - [`ffmpeg`](https://ffmpeg.org/) (used by yt-dlp for audio extraction/embedding; its `ffprobe` is also used to read tags for lyrics)
 - [Kitty terminal](https://sw.kovidgoyal.net/kitty/) for high-resolution thumbnail previews. Other terminals get an ANSI fallback, but Kitty is what this is built and tested on.
+- Optional: [`mpv`](https://mpv.io/) for the `p` preview (it uses `yt-dlp` to stream, so both must be installed)
+- Optional: `python-mutagen` (Arch; `pip install mutagen` elsewhere) if you pick `opus` or `flac`, so yt-dlp can embed cover art in those formats
 - Optional: `notify-send` (Linux) or `osascript` (macOS, built-in) for batch-completion notifications
 
 ## Installation
@@ -49,7 +53,7 @@ Move the binary somewhere on your `PATH` (e.g. `~/.local/bin`) to launch it from
 
 1. Press `/` and type a search, or paste a YouTube link. Press `enter`.
 2. Move through the results with `↑`/`↓` (or `j`/`k`). The info box shows the title, artist, channel, size and duration.
-3. Press `space` to add the highlighted item to the queue. Use `tab` to switch the default type between Audio and Video.
+3. Press `space` to add the highlighted item to the queue, or `a` to queue every listed result. Use `tab` to switch the default type between Audio and Video. Press `p` to preview the highlighted item first.
 4. Press `w` to open the queue, then `enter` to download everything in it. To grab just one item, press `enter` on it in the result list.
 
 ## Configuration
@@ -99,6 +103,28 @@ On first run, a default config is written to:
   // as .lrc files. "yt-media lyrics" does the same for your whole library.
   "fetch_lyrics": true,
 
+  // Audio format for downloads: "mp3" (default), "opus", "flac" or "m4a".
+  // opus and flac need python-mutagen for embedded cover art.
+  "audio_format": "mp3",
+
+  // Cap video downloads (and video previews) at this height, e.g. 1080.
+  // 0 = best available.
+  "max_video_height": 0,
+
+  // Use a browser's cookies, e.g. "firefox" or "chrome" (yt-dlp's
+  // --cookies-from-browser). Helps with age-restricted videos and with
+  // YouTube asking you to sign in. Blank = off. Used for downloads, size
+  // lookups, playlists and previews.
+  "cookies_from_browser": "",
+
+  // Audio downloads only: cut non-music parts using SponsorBlock categories,
+  // comma-separated, e.g. "music_offtopic" or "sponsor,intro,outro".
+  // Blank = off.
+  "sponsorblock_remove": "",
+
+  // The program used for previews.
+  "preview_player": "mpv",
+
   // Where .lrc files go. Blank = a "lyrics" folder inside music_dir, mirroring
   // its folder structure.
   "lyrics_dir": "",
@@ -133,6 +159,15 @@ Kitty renders thumbnails at real pixel resolution rather than ANSI blocks, but r
 2. Set `font_shrink_delta` in your config to something above `0` (try `1.5`–`3`).
 
 This is entirely optional — leaving it at `0` (or not enabling remote control) just means thumbnails render at your terminal's normal cell density. The font size is restored when you quit.
+
+## Preview
+
+Press `p` on a result to try it before downloading.
+
+- **Audio mode** — a small player window opens over the list with the title, a progress bar, the time and the volume. A hidden `mpv` does the playing and the interface controls it. Keys: `space` pause/resume, `←`/`→` seek 5 seconds (`H`/`L` for 30), `↑`/`↓` volume, `esc`/`q`/`p` close and stop playback.
+- **Video mode** (the default type is shown in the footer; switch with `tab`) — `mpv` opens its own window and plays picture and sound there. It runs separately, so closing the interface doesn't stop it.
+
+Both modes need `mpv` and `yt-dlp` installed. If `mpv` isn't found, the footer says so. Your own `mpv.conf` is respected.
 
 ## Lyrics
 
@@ -191,12 +226,24 @@ YouTube usually doesn't know which album a song is on, so players show "Unknown 
 | `enter`          | Run the search while typing; otherwise download the highlighted item |
 | `↑`/`k`, `↓`/`j` | Move selection (wraps around the list)                               |
 | `space`          | Add/remove the highlighted item in the queue                         |
+| `a`              | Queue every listed result that isn't already queued                  |
+| `p`              | Preview the highlighted item (see [Preview](#preview))               |
 | `tab`            | Toggle default download type (Audio/Video)                           |
 | `w`              | Open the download queue window                                       |
 | `e`              | Open the error window                                                |
 | `r`              | Retry all failed downloads                                           |
 | `esc`            | Reset search/results                                                 |
 | `q` / `ctrl+c`   | Quit                                                                 |
+
+### Player window (`p`, audio mode)
+
+| Key               | Action                         |
+| ----------------- | ------------------------------ |
+| `space`           | Pause / resume                 |
+| `←`/`h`, `→`/`l`  | Seek 5 seconds back / forward  |
+| `H`, `L`          | Seek 30 seconds back / forward |
+| `↑`/`k`, `↓`/`j`  | Volume up / down               |
+| `esc` / `q` / `p` | Close and stop playback        |
 
 ### Queue window (`w`)
 
@@ -227,9 +274,9 @@ The list shows failed items first, then queued items, under a single cursor.
 
 ## How it works
 
-- Searches go through `yt-dlp --dump-json --flat-playlist ytsearch<N>:<query>`; pasted URLs skip straight to a single-item metadata fetch.
+- Searches go through `yt-dlp --dump-json --flat-playlist ytsearch<N>:<query>`; pasted video URLs skip straight to a single-item metadata fetch, and playlist URLs are listed with `--flat-playlist` (up to 200 entries).
 - Thumbnails are cached locally (`~/.cache/yt-media/thumbs`) during a session and cleared on exit.
-- Downloads run through `yt-dlp` directly — audio is extracted to MP3, video keeps the best available audio+video streams — with metadata and thumbnails embedded automatically.
+- Downloads run through `yt-dlp` directly — audio is extracted to your chosen `audio_format` (MP3 by default), video keeps the best available audio+video streams (up to `max_video_height`) — with metadata and thumbnails embedded automatically.
 - yt-dlp reports where each file ended up (`--print-to-file after_move:filepath`), which is how lyrics are attached to the right file.
 - A yt-dlp `--download-archive` file tracks completed video IDs so repeat searches don't redownload existing files.
 - Your queue and any failed downloads are saved to `~/.cache/yt-media/queue.json`, so they're still there next time you launch.
@@ -238,6 +285,8 @@ The list shows failed items first, then queued items, under a single cursor.
 
 - **`HTTP Error 403: Forbidden`** — YouTube changes often, and an outdated yt-dlp is the usual cause. Update it (`yt-dlp -U`, or through your package manager) and retry with `r`.
 - **"Network unavailable"** — yt-dlp couldn't reach YouTube. Check your connection and retry.
+- **Preview says `mpv not found`** — install `mpv` (it needs `yt-dlp` too), or set `preview_player` to another mpv-compatible program.
+- **YouTube asks you to sign in / age-restricted video** — set `cookies_from_browser` to a browser you're logged into, e.g. `"firefox"`.
 - **Anything else** — open the error window (`e`) and press `enter` for the full yt-dlp output. Everything is also logged to `~/.cache/yt-media/debug.log` (run `yt-media paths` to see it).
 
 ## License

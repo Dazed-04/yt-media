@@ -108,7 +108,7 @@ func stripComments(data []byte) []byte {
 }
 
 const defaultTemplate = `{
-  // Number of simultaneous yt-dlp downloads.
+	// Number of simultaneous yt-dlp downloads.
   "max_workers": 3,
 
   // "Audio" or "Video" — the default selected on startup.
@@ -145,41 +145,42 @@ const defaultTemplate = `{
   // as .lrc files. "yt-media lyrics" does the same for your whole library.
   "fetch_lyrics": true,
 
+  // Audio format for downloads: "mp3" (default), "opus", "flac" or "m4a".
+  // opus and flac need python-mutagen for embedded cover art.
+  "audio_format": "mp3",
+
+  // Cap video downloads (and video previews) at this height, e.g. 1080.
+  // 0 = best available.
+  "max_video_height": 0,
+
+  // Use a browser's cookies, e.g. "firefox" or "chrome" (yt-dlp's
+  // --cookies-from-browser). Helps with age-restricted videos and with
+  // YouTube asking you to sign in. Blank = off. Used for downloads, size
+  // lookups, playlists and previews.
+  "cookies_from_browser": "",
+
+  // Audio downloads only: cut non-music parts using SponsorBlock categories,
+  // comma-separated, e.g. "music_offtopic" or "sponsor,intro,outro".
+  // Blank = off.
+  "sponsorblock_remove": "",
+
+  // The program used for previews.
+  "preview_player": "mpv",
+
   // Where .lrc files go. Blank = a "lyrics" folder inside music_dir, mirroring
   // its folder structure.
   "lyrics_dir": "",
 
-	// Also write .srt subtitles next to downloaded videos (when they have none).
+  // Paths (relative to music_dir) to skip, matched as prefixes.
+  "lyrics_exclude": [],
+
+  // Also write .srt subtitles next to downloaded videos (when they have none).
   "lyrics_for_video": false,
 
   // Optional: a command to try when LRCLIB has nothing. {query} and {output}
   // are replaced; no shell is used. Example:
   //   "syncedlyrics {query} -o {output} --synced-only -p musixmatch"
   "lyrics_fallback_command": "",
-
-	// Paths (relative to music_dir) to skip for ALL operations (lyrics and album).
-  "music_exclude": [],
-
-  // Paths to skip exclusively during album tagging.
-  "album_exclude": [],
-
-  // Paths to skip exclusively during lyrics fetching.
-  "lyrics_exclude": [],
-	
-	// Select audio format for downloads: mp3 | opus | flac | m4a
-	"audio_format": "mp3",
-
-	// Select video quality | 0 = best; e.g. 1080
-  "max_video_height": 0,
-
-	// Select browser to fetch cookies to bypass age restriction and bot detection | e.g. "firefox" or "chrome"
-  "cookies_from_browser": "",
-
-	// Remove sponsor section from audio | e.g. "music_offtopic"
-  "sponsorblock_remove": "",
-
-	// Select player for video preview
-  "preview_player": "mpv"
 }
 `
 
