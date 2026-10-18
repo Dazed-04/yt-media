@@ -7,11 +7,15 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-// The window frame is made of half-block glyphs on the outer edge of the
-// cells, so no filled background sticks out beyond the visible border.
-func TestOverlayFrameIsOuterHalfBlocks(t *testing.T) {
+// Every popup window is one clean rectangle: all lines the same width, with
+// the rounded frame complete on every row.
+func TestOverlayFrameIsComplete(t *testing.T) {
 	m := &Model{Width: 80, Height: 30, Queue: []DownloadReq{{Type: "Audio"}}}
-	for name, box := range map[string]string{"queue": m.renderQueueOverlay(), "errors": m.renderErrorsOverlay()} {
+	for name, box := range map[string]string{
+		"queue":  m.renderQueueOverlay(),
+		"errors": m.renderErrorsOverlay(),
+		"player": m.renderPlayerOverlay(),
+	} {
 		lines := strings.Split(box, "\n")
 		w := lipgloss.Width(lines[0])
 		for i, l := range lines {
@@ -20,15 +24,17 @@ func TestOverlayFrameIsOuterHalfBlocks(t *testing.T) {
 			}
 		}
 		first, last := stripANSI(lines[0]), stripANSI(lines[len(lines)-1])
-		if !strings.HasPrefix(first, "▛▀") || !strings.HasSuffix(first, "▀▜") {
+		if !strings.HasPrefix(first, "╭") || !strings.HasSuffix(first, "╮") {
 			t.Errorf("%s: top edge = %q", name, first)
 		}
-		if !strings.HasPrefix(last, "▙▄") || !strings.HasSuffix(last, "▄▟") {
+		if !strings.HasPrefix(last, "╰") || !strings.HasSuffix(last, "╯") {
 			t.Errorf("%s: bottom edge = %q", name, last)
 		}
-		mid := stripANSI(lines[1])
-		if !strings.HasPrefix(mid, "▌") || !strings.HasSuffix(mid, "▐") {
-			t.Errorf("%s: side edges = %q", name, mid)
+		for i := 1; i < len(lines)-1; i++ {
+			l := stripANSI(lines[i])
+			if !strings.HasPrefix(l, "│") || !strings.HasSuffix(l, "│") {
+				t.Errorf("%s: row %d lacks side edges: %q", name, i, l)
+			}
 		}
 	}
 }
