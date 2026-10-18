@@ -29,8 +29,16 @@ func extractYoutubeID(s string) (string, bool) {
 func (m *Model) doSearch() tea.Cmd {
 	query := strings.TrimSpace(m.SearchQuery)
 	limit := m.Config.SearchResultLimit
+	cookies := m.Config.CookieArgs()
 
 	return func() tea.Msg {
+		if id, ok := downloader.PlaylistID(query); ok {
+			vs, err := downloader.FetchPlaylist(id, maxPlaylistEntries, cookies)
+			if err != nil {
+				return errorMsg(err)
+			}
+			return searchResultsMsg(vs)
+		}
 		if id, ok := extractYoutubeID(query); ok {
 			v, err := downloader.FetchSingle(id)
 			if err != nil {
@@ -51,7 +59,12 @@ func (m *Model) onSearchResults(videos []downloader.Video) tea.Cmd {
 	m.IsFetching = false
 	m.purgePreviewCache()
 
-	results := filterRelevant(videos, m.SearchQuery)
+	var results []downloader.Video
+	if _, ok := downloader.PlaylistID(strings.TrimSpace(m.SearchQuery)); ok {
+		results = dedupe(videos) // a playlist is the whole list, whatever its titles say
+	} else {
+		results = filterRelevant(videos, m.SearchQuery)
+	}
 	m.MusicList = results
 	m.FilteredList = results
 	m.Cursor = 0
@@ -66,6 +79,22 @@ func (m *Model) onSearchResults(videos []downloader.Video) tea.Cmd {
 		cmds = append(cmds, m.fetchSizeCmd(v, m.ChoiceType))
 	}
 	return tea.Batch(cmds...)
+}
+
+// maxPlaylistEntries caps how many playlist entries are loaded.
+const maxPlaylistEntries = 200
+
+// dedupe drops repeated IDs, keeping order.
+func dedupe(videos []downloader.Video) []downloader.Video {
+	seen := make(map[string]bool, len(videos))
+	out := make([]downloader.Video, 0, len(videos))
+	for _, v := range videos {
+		if !seen[v.ID] {
+			seen[v.ID] = true
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 // filterRelevant drops duplicates and results that share no word with the
@@ -113,14 +142,16 @@ func (m *Model) fetchSizeCmd(v downloader.Video, format string) tea.Cmd {
 		return nil
 	}
 	m.SizeInFlight[key] = true
+	opts := m.Config.DownloadOptions // copy: the cmd runs on its own goroutine
 
 	return func() tea.Msg {
 		args := []string{"--print", "%(filesize,filesize_approx)s"}
 		if format == "Audio" {
 			args = append(args, "-f", "bestaudio/best")
 		} else {
-			args = append(args, "-f", "bestvideo+bestaudio/best")
+			args = append(args, "-f", opts.VideoSelector())
 		}
+		args = append(args, opts.CookieArgs()...)
 		args = append(args, v.ID)
 
 		sizeStr := "Unknown"

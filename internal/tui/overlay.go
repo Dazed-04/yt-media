@@ -14,7 +14,7 @@ import (
 // ---------- state ----------
 
 func (m *Model) overlayOpen() bool {
-	return m.QueueOpen || m.ErrorsOpen
+	return m.QueueOpen || m.ErrorsOpen || m.PlayerOpen
 }
 
 func (m *Model) showQueue() {
@@ -219,8 +219,8 @@ func windowBox(s winStyles, w int, header string, sections [][]string, hintLines
 	return lipgloss.NewStyle().
 		Width(w).
 		Background(colWinBG).
-		Border(lipgloss.OuterHalfBlockBorder()).
-		BorderForeground(colWinFrame).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(colBlue).
 		BorderBackground(colWinBG).
 		Padding(0, 1).
 		Render(strings.Join(lines, "\n"))

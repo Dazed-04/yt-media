@@ -186,10 +186,12 @@ func (p downloadParams) args(dir, pathFile string) []string {
 
 	var args []string
 	if p.req.Type == "Audio" {
-		args = []string{"-f", "bestaudio/best", "-o", out, "--extract-audio", "--audio-format", "mp3"}
+		args = []string{"-f", "bestaudio/best", "-o", out, "--extract-audio", "--audio-format", p.cfg.AudioFormatOrDefault()}
+		args = append(args, p.cfg.SponsorblockArgs()...)
 	} else {
-		args = []string{"-f", "bestvideo+bestaudio/best", "-o", out}
+		args = []string{"-f", p.cfg.VideoSelector(), "-o", out}
 	}
+	args = append(args, p.cfg.CookieArgs()...)
 	if pathFile != "" {
 		args = append(args, "--print-to-file", "after_move:filepath", pathFile)
 	}

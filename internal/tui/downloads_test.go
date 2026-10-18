@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"yt-downloader/internal/config"
 	"yt-downloader/internal/downloader"
@@ -163,5 +164,45 @@ func TestDownloadWithoutAlbumGoesToUnknownAlbum(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(home, "Music", "Ace Hood", "Unknown Album", "Video Title.mp3")); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func joined(a []string) string { return " " + strings.Join(a, " ") + " " }
+
+func TestArgsHonourDownloadOptions(t *testing.T) {
+	cfg := config.DefaultDownloadOptions()
+	cfg.AudioFormat = "opus"
+	cfg.SponsorblockRemove = "music_offtopic"
+	cfg.CookiesFromBrowser = "firefox"
+	cfg.MaxVideoHeight = 720
+	base := downloadParams{home: "/h", archive: "/a", req: DownloadReq{Video: downloader.Video{ID: "abcdefghijk"}}}
+	base.cfg.DownloadOptions = cfg
+
+	au := base
+	au.req.Type = "Audio"
+	got := joined(au.args("/d", ""))
+	for _, w := range []string{" --audio-format opus ", " --sponsorblock-remove music_offtopic ", " --cookies-from-browser firefox "} {
+		if !strings.Contains(got, w) {
+			t.Errorf("audio args lack %q: %s", w, got)
+		}
+	}
+
+	vi := base
+	vi.req.Type = "Video"
+	got = joined(vi.args("/d", ""))
+	if !strings.Contains(got, "bestvideo[height<=720]+bestaudio/best[height<=720]") || !strings.Contains(got, " --cookies-from-browser firefox ") {
+		t.Errorf("video args: %s", got)
+	}
+	if strings.Contains(got, "sponsorblock") || strings.Contains(got, "--audio-format") {
+		t.Errorf("audio-only options leaked into video: %s", got)
+	}
+
+	// defaults are unchanged: mp3, no cookies, no sponsorblock
+	def := base
+	def.cfg.DownloadOptions = config.DefaultDownloadOptions()
+	def.req.Type = "Audio"
+	got = joined(def.args("/d", ""))
+	if !strings.Contains(got, " --audio-format mp3 ") || strings.Contains(got, "cookies") || strings.Contains(got, "sponsorblock") {
+		t.Errorf("default args: %s", got)
 	}
 }

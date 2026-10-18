@@ -51,6 +51,9 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Focused = false
 
 	// ui ticks
+	case playerTickMsg:
+		return m, m.onPlayerTick(msg)
+
 	case blinkMsg:
 		if m.Searching {
 			m.Blink = !m.Blink

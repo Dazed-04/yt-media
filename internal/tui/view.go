@@ -49,7 +49,10 @@ func (m *Model) View() tea.View {
 // withOverlay draws the open popup window centered over content.
 func (m *Model) withOverlay(content string) string {
 	box := m.renderQueueOverlay()
-	if m.ErrorsOpen {
+	switch {
+	case m.PlayerOpen:
+		box = m.renderPlayerOverlay()
+	case m.ErrorsOpen:
 		box = m.renderErrorsOverlay()
 	}
 	x := max(0, (m.Width-lipgloss.Width(box))/2)
@@ -312,7 +315,7 @@ func (m *Model) renderProgress() string {
 // ---------- 5. footer ----------
 
 func (m *Model) renderFooter() string {
-	text := fmt.Sprintf("(esc: reset • /: search • tab: default %s • space: queue • w: queue [%d] • e: errors [%d] • enter: download • r: retry)",
+	text := fmt.Sprintf("(esc: reset • /: search • tab: default %s • space: queue • w: queue [%d] • e: errors [%d] • p: preview • a: queue all • enter: download • r: retry)",
 		m.ChoiceType, len(m.Queue), len(m.Failed))
 	color := colDim
 

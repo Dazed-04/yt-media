@@ -9,6 +9,7 @@ import (
 
 	"yt-downloader/internal/config"
 	"yt-downloader/internal/downloader"
+	"yt-downloader/internal/player"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -51,6 +52,12 @@ type Model struct {
 	ErrorsOpen    bool
 	ErrorCursor   int
 	ErrorExpanded bool
+
+	// Audio preview (p): a hidden mpv shown as a small player window
+	Player      *player.Session
+	PlayerOpen  bool
+	PlayerTitle string
+	playerSeq   int
 
 	// Active batch
 	DownloadState   DownloadStatus
@@ -118,6 +125,7 @@ func (m *Model) Init() tea.Cmd {
 // Cleanup restores the terminal and removes temporary files. Call it before
 // quitting.
 func (m *Model) Cleanup() {
+	m.closePlayer()
 	m.persistQueue()
 	restoreKittyFont(m.fontShrinkDelta)
 	deleteAllKittyImages()

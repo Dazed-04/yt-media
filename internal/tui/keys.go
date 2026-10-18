@@ -14,6 +14,8 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.quit()
 	}
 	switch {
+	case m.PlayerOpen:
+		return m.handlePlayerKey(msg)
 	case m.ErrorsOpen:
 		return m.handleErrorsKey(msg)
 	case m.QueueOpen:
@@ -136,6 +138,14 @@ func (m *Model) handleBrowseKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			text = "Added to queue (%d)"
 		}
 		return m, tea.Batch(m.flash(fmt.Sprintf(text, len(m.Queue)), false), m.step(1))
+
+	case "p":
+		if v, ok := m.current(); ok {
+			return m, m.startPreview(v)
+		}
+
+	case "a":
+		return m, m.queueAll()
 
 	case "enter":
 		v, ok := m.current()

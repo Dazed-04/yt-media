@@ -24,6 +24,8 @@ type Config struct {
 	FetchAlbum   bool     `json:"fetch_album"`   // look up the real album (MusicBrainz) for tracks that have none
 	AlbumExclude []string `json:"album_exclude"` // paths skipped only by album tagger
 
+	DownloadOptions
+
 	FetchLyrics           bool     `json:"fetch_lyrics"`            // look up lyrics after each download
 	LyricsDir             string   `json:"lyrics_dir"`              // blank = <music_dir>/lyrics
 	LyricsExclude         []string `json:"lyrics_exclude"`          // paths skipped only by lyrics tagger
@@ -43,6 +45,7 @@ func defaults() Config {
 		NotifyOnlyUnfocused: true,
 		FetchLyrics:         true,
 		FetchAlbum:          true,
+		DownloadOptions:     DefaultDownloadOptions(),
 	}
 }
 
@@ -161,7 +164,22 @@ const defaultTemplate = `{
   "album_exclude": [],
 
   // Paths to skip exclusively during lyrics fetching.
-  "lyrics_exclude": []
+  "lyrics_exclude": [],
+	
+	// Select audio format for downloads: mp3 | opus | flac | m4a
+	"audio_format": "mp3",
+
+	// Select video quality | 0 = best; e.g. 1080
+  "max_video_height": 0,
+
+	// Select browser to fetch cookies to bypass age restriction and bot detection | e.g. "firefox" or "chrome"
+  "cookies_from_browser": "",
+
+	// Remove sponsor section from audio | e.g. "music_offtopic"
+  "sponsorblock_remove": "",
+
+	// Select player for video preview
+  "preview_player": "mpv"
 }
 `
 
