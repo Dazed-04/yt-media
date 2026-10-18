@@ -214,7 +214,6 @@ YouTube usually doesn't know which album a song is on, so players show "Unknown 
 - Songs MusicBrainz doesn't know stay untagged, and are filed under `Unknown Album`.
 - Both LRCLIB and MusicBrainz limit how fast they can be asked. Requests are spaced out, "429/503 - slow down" answers are waited out (honouring `Retry-After`) and retried, and a scan stops with a clear message if a service keeps refusing; just run it again later, finished songs are skipped.
 - For songs you already have, run `yt-media album` (about one song per second, MusicBrainz's limit). If you use `mpd`, update its database afterwards (`mpc update`).
-- Before publishing your fork, set the `userAgent` in `internal/album/album.go` to your own repository URL; MusicBrainz asks apps to identify themselves.
 
 ## Keybindings
 
