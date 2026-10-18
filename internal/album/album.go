@@ -30,8 +30,8 @@ var (
 	baseURL    = "https://musicbrainz.org"
 	httpClient = &http.Client{Timeout: 15 * time.Second}
 	// MusicBrainz requires a User-Agent that identifies the app and a way to
-	// reach its author. Put your repository URL or e-mail here.
-	userAgent = "yt-media/1.0 ( https://github.com/your-name/yt-media )"
+	// reach its author.
+	userAgent = "yt-media/1.0 ( https://github.com/Dazed-04/yt-media )"
 
 	// MusicBrainz allows one request per second, in total. The limiter is shared
 	// by every caller (the TUI's downloads and the album command alike), and
