@@ -180,7 +180,7 @@ const defaultTemplate = `{
   // Optional: a command to try when LRCLIB has nothing. {query} and {output}
   // are replaced; no shell is used. Example:
   //   "syncedlyrics {query} -o {output} --synced-only -p musixmatch"
-  "lyrics_fallback_command": "",
+  "lyrics_fallback_command": ""
 }
 `
 
