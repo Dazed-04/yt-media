@@ -150,7 +150,7 @@ const defaultTemplate = `{
   "audio_format": "mp3",
 
   // Cap video downloads (and video previews) at this height, e.g. 1080.
-  // 0 = best available.
+  // 0 = best available. (int not string)
   "max_video_height": 0,
 
   // Use a browser's cookies, e.g. "firefox" or "chrome" (yt-dlp's
