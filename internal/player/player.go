@@ -110,10 +110,12 @@ func (s *Session) Seek(secs float64) { s.send("seek", secs, "relative") }
 
 // AddVolume changes the volume by delta percentage points.
 func (s *Session) AddVolume(delta float64) {
-	s.send("add", "volume", delta)
-	s.mu.Lock() // optimistic: the next property event confirms it
+	// Show the change at once, before sending: mpv's confirmation arrives as
+	// a property event and must be able to overwrite this, never the reverse.
+	s.mu.Lock()
 	s.st.Volume = min(max(s.st.Volume+delta, 0), 130)
 	s.mu.Unlock()
+	s.send("add", "volume", delta)
 }
 
 // Close stops mpv and removes its socket. It is safe to call more than once.
@@ -152,8 +154,7 @@ func (s *Session) wait() {
 	defer s.mu.Unlock()
 	s.st.Ended = true
 	if err != nil && !s.closed && s.st.Failed == "" {
-		var ee *exec.ExitError
-		if errors.As(err, &ee) {
+		if _, ok := errors.AsType[*exec.ExitError](err); ok {
 			s.st.Failed = "mpv could not play this (is yt-dlp installed?)"
 		} else {
 			s.st.Failed = err.Error()
