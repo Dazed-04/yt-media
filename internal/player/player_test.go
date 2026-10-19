@@ -3,6 +3,7 @@ package player
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -24,6 +25,12 @@ func TestMain(m *testing.M) {
 
 func fakeMPV(mode string) {
 	if mode == "crash" {
+		os.Exit(2)
+	}
+	if mode == "explain" {
+		fmt.Fprintln(os.Stderr, "[ytdl_hook] ERROR: Sign in to confirm you're not a bot")
+		fmt.Fprintln(os.Stderr, "[ytdl_hook] youtube-dl failed: unexpected error occurred")
+		fmt.Fprintln(os.Stderr, "Failed to recognize file format.")
 		os.Exit(2)
 	}
 	var sock string
@@ -145,7 +152,7 @@ func TestArgsAreSafeAndComplete(t *testing.T) {
 		args = string(b)
 		return err == nil && len(b) > 0
 	})
-	for _, want := range []string{"--no-video", "--no-terminal", "--volume=50", "--ytdl-format=bestaudio/best", "--ytdl-raw-options=cookies-from-browser=firefox"} {
+	for _, want := range []string{"--no-video", "--no-input-terminal", "--volume=50", "--ytdl-format=bestaudio/best", "--ytdl-raw-options-remove=cookies-from-browser", "--ytdl-raw-options-add=cookies-from-browser=%7%firefox"} {
 		if !strings.Contains(args, want+"\n") && !strings.HasSuffix(args, want) {
 			t.Errorf("mpv args lack %q:\n%s", want, args)
 		}
@@ -192,4 +199,33 @@ func TestCloseStopsMpvAndCleansUp(t *testing.T) {
 		t.Errorf("temp dir still there: %v", err)
 	}
 	s.Seek(5) // controlling a closed session must not panic
+}
+
+func TestFailureCarriesMpvsExplanation(t *testing.T) {
+	s := start(t, "explain", Options{URL: "x"})
+	waitFor(t, "failure", func() bool { st := s.State(); return st.Ended && st.Failed != "" })
+	got := s.State().Failed
+	if !strings.Contains(got, "Sign in to confirm") || strings.Contains(got, "ytdl_hook") {
+		t.Errorf("Failed = %q, want yt-dlp's own message without the prefix", got)
+	}
+}
+
+func TestYtdlCookieArgs(t *testing.T) {
+	const rm = "--ytdl-raw-options-remove=cookies-from-browser"
+	// nothing configured: still drop whatever mpv.conf set
+	if got := YtdlCookieArgs("  "); len(got) != 1 || got[0] != rm {
+		t.Errorf("blank = %v", got)
+	}
+	// an option-looking value is never passed on
+	if got := YtdlCookieArgs("--script=x"); len(got) != 1 {
+		t.Errorf("option-like = %v", got)
+	}
+	// a Firefox-fork profile path with spaces, parentheses and a comma is
+	// length-prefixed so mpv can't split it
+	p := "firefox:/home/u/.zen/ab12.Default (release),x"
+	got := YtdlCookieArgs(p)
+	want := "--ytdl-raw-options-add=cookies-from-browser=%" + fmt.Sprint(len(p)) + "%" + p
+	if len(got) != 2 || got[0] != rm || got[1] != want {
+		t.Errorf("path = %q, want %q", got, want)
+	}
 }

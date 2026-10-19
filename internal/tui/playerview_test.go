@@ -42,10 +42,22 @@ func TestVideoPreviewArgs(t *testing.T) {
 	o.MaxVideoHeight = 1080
 	o.CookiesFromBrowser = "chrome"
 	got := strings.Join(videoPreviewArgs(o, "https://x/y"), " ")
-	for _, w := range []string{"--ytdl-format=bestvideo[height<=1080]+bestaudio/best[height<=1080]", "--ytdl-raw-options=cookies-from-browser=chrome", "-- https://x/y"} {
+	for _, w := range []string{"--ytdl-format=bestvideo[height<=1080]+bestaudio/best[height<=1080]", "--ytdl-raw-options-remove=cookies-from-browser", "-- https://x/y"} {
 		if !strings.Contains(got, w) {
 			t.Errorf("missing %q in %s", w, got)
 		}
+	}
+}
+
+func TestPreviewNeverUsesCookies(t *testing.T) {
+	o := config.DefaultDownloadOptions()
+	o.CookiesFromBrowser = "firefox:/home/u/.zen/abc.Default (release)"
+	got := strings.Join(videoPreviewArgs(o, "https://x/y"), " ")
+	if strings.Contains(got, "cookies-from-browser=") || strings.Contains(got, "-add=") {
+		t.Errorf("preview passes cookies: %s", got)
+	}
+	if !strings.Contains(got, "--ytdl-raw-options-remove=cookies-from-browser") {
+		t.Errorf("preview should still drop mpv.conf's cookies: %s", got)
 	}
 }
 

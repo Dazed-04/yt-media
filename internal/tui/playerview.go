@@ -2,8 +2,10 @@ package tui
 
 import (
 	"fmt"
+	"log"
 	"os/exec"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -56,24 +58,15 @@ func (m *Model) startPreview(v downloader.Video) tea.Cmd {
 
 	m.closePlayer()
 	s, err := player.Start(player.Options{
-		Binary:             opts.Player(),
-		URL:                url,
-		Format:             "bestaudio/best",
-		CookiesFromBrowser: strings.Join(cookieValue(opts), ""),
+		Binary: opts.Player(),
+		URL:    url,
+		Format: "bestaudio/best",
 	})
 	if err != nil {
 		return m.flash(err.Error(), true)
 	}
 	m.Player, m.PlayerOpen, m.PlayerTitle = s, true, v.GetDisplayString()
 	return m.playerTick()
-}
-
-// cookieValue is the browser name from CookieArgs ("--cookies-from-browser X").
-func cookieValue(o config.DownloadOptions) []string {
-	if a := o.CookieArgs(); len(a) == 2 {
-		return a[1:]
-	}
-	return nil
 }
 
 func (m *Model) closePlayer() {
@@ -87,10 +80,12 @@ func (m *Model) closePlayer() {
 
 // videoPreviewArgs builds the mpv command line for a video preview window.
 func videoPreviewArgs(o config.DownloadOptions, url string) []string {
+	// No cookies for previews: YouTube gives logged-in requests stream URLs
+	// that mpv can't fetch (HTTP 403). Downloads use cookies_from_browser;
+	// previews stay logged out, and any cookies line in the user's mpv.conf
+	// is dropped.
 	args := []string{"--ytdl-format=" + o.VideoSelector()}
-	if v := cookieValue(o); len(v) == 1 {
-		args = append(args, "--ytdl-raw-options=cookies-from-browser="+v[0])
-	}
+	args = append(args, player.YtdlCookieArgs("")...)
 	return append(args, "--", url)
 }
 
@@ -104,10 +99,16 @@ func launchVideoPreview(o config.DownloadOptions, url string) error {
 	}
 	cmd := exec.Command(path, videoPreviewArgs(o, url)...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	var out lockedBuf
+	cmd.Stdout, cmd.Stderr = &out, &out
 	if err := cmd.Start(); err != nil {
 		return err
 	}
-	go cmd.Wait() // reap it when the window closes
+	go func() { // reap it when the window closes; a failure goes to the log
+		if err := cmd.Wait(); err != nil {
+			log.Printf("[PREVIEW] %s exited: %v: %s", bin, err, strings.TrimSpace(out.String()))
+		}
+	}()
 	return nil
 }
 
@@ -213,4 +214,25 @@ func (m *Model) renderPlayerOverlay() string {
 
 	hints := [][]string{{"space: pause", "←/→: seek 5s", "↑/↓: volume", "esc: close"}}
 	return windowBox(s, w, header, [][]string{rows}, hints)
+}
+
+// lockedBuf collects a detached process's output for the log.
+type lockedBuf struct {
+	mu sync.Mutex
+	b  []byte
+}
+
+func (l *lockedBuf) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if len(l.b) < 8192 {
+		l.b = append(l.b, p...)
+	}
+	return len(p), nil
+}
+
+func (l *lockedBuf) String() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return string(l.b)
 }

@@ -34,6 +34,7 @@ Search by name, paste a raw video URL, preview the thumbnail in full quality (on
 - Optional: [`mpv`](https://mpv.io/) for the `p` preview (it uses `yt-dlp` to stream, so both must be installed)
 - Optional: `python-mutagen` (Arch; `pip install mutagen` elsewhere) if you pick `opus` or `flac`, so yt-dlp can embed cover art in those formats
 - Optional: `notify-send` (Linux) or `osascript` (macOS, built-in) for batch-completion notifications
+- For macOS: brew install mpv yt-dlp ffmpeg (optional: kitty, for high quality image rendering)
 
 ## Installation
 
@@ -114,7 +115,7 @@ On first run, a default config is written to:
   // Use a browser's cookies, e.g. "firefox" or "chrome" (yt-dlp's
   // --cookies-from-browser). Helps with age-restricted videos and with
   // YouTube asking you to sign in. Blank = off. Used for downloads, size
-  // lookups, playlists and previews.
+  // lookups, playlists.
   "cookies_from_browser": "",
 
   // Audio downloads only: cut non-music parts using SponsorBlock categories,

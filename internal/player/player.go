@@ -27,6 +27,23 @@ type Options struct {
 	Volume             int    // 0-100; 0 = 70
 }
 
+// YtdlCookieArgs makes the browser-cookies setting come from this app's config
+// alone. A user's mpv.conf may carry its own cookies-from-browser (for a
+// browser they don't use, say) and would break every preview, so that one key
+// is removed from mpv's ytdl-raw-options first; the rest of the list (other
+// yt-dlp options in mpv.conf) is kept. Command-line options are applied after
+// mpv.conf, so this wins without touching the user's files.
+func YtdlCookieArgs(cookies string) []string {
+	args := []string{"--ytdl-raw-options-remove=cookies-from-browser"}
+	c := strings.TrimSpace(cookies)
+	if c == "" || strings.HasPrefix(c, "-") {
+		return args
+	}
+	// %N%value gives mpv the value's byte length, so spaces, commas and
+	// colons in a profile path can't be misread as list syntax.
+	return append(args, fmt.Sprintf("--ytdl-raw-options-add=cookies-from-browser=%%%d%%%s", len(c), c))
+}
+
 // State is a snapshot of the playback.
 type State struct {
 	Title     string
@@ -41,6 +58,7 @@ type State struct {
 // Session is one running mpv.
 type Session struct {
 	cmd  *exec.Cmd
+	out  *tail // mpv's own error output, for explaining a failure
 	dir  string
 	sock string
 
@@ -62,7 +80,7 @@ func Start(o Options) (*Session, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s not found: install it to preview tracks", bin)
 	}
-	dir, err := os.MkdirTemp("", "yt-media-mpv-")
+	dir, err := os.MkdirTemp("", "ytm-")
 	if err != nil {
 		return nil, err
 	}
@@ -70,22 +88,24 @@ func Start(o Options) (*Session, error) {
 	if vol <= 0 {
 		vol = 70
 	}
-	s := &Session{dir: dir, sock: filepath.Join(dir, "ipc.sock"), st: State{Volume: float64(vol)}}
+	// Unix socket paths are limited to ~104 bytes on macOS, whose temp folder
+	// is long, so the names here are kept short.
+	s := &Session{dir: dir, sock: filepath.Join(dir, "s"), st: State{Volume: float64(vol)}}
 
 	args := []string{
-		"--no-video", "--no-terminal", "--idle=no", "--force-window=no", "--audio-display=no",
+		"--no-video", "--no-input-terminal", "--msg-level=all=error", "--idle=no", "--force-window=no", "--audio-display=no",
 		"--input-ipc-server=" + s.sock,
 		fmt.Sprintf("--volume=%d", vol),
 	}
 	if o.Format != "" {
 		args = append(args, "--ytdl-format="+o.Format)
 	}
-	if c := strings.TrimSpace(o.CookiesFromBrowser); c != "" && !strings.ContainsAny(c, ",") && !strings.HasPrefix(c, "-") {
-		args = append(args, "--ytdl-raw-options=cookies-from-browser="+c)
-	}
+	args = append(args, YtdlCookieArgs(o.CookiesFromBrowser)...)
 	args = append(args, "--", o.URL)
 
 	s.cmd = exec.Command(path, args...)
+	s.out = &tail{}
+	s.cmd.Stdout, s.cmd.Stderr = s.out, s.out
 	if err := s.cmd.Start(); err != nil {
 		os.RemoveAll(dir)
 		return nil, err
@@ -153,12 +173,20 @@ func (s *Session) wait() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.st.Ended = true
-	if err != nil && !s.closed && s.st.Failed == "" {
-		if _, ok := errors.AsType[*exec.ExitError](err); ok {
-			s.st.Failed = "mpv could not play this (is yt-dlp installed?)"
+	if s.closed {
+		return
+	}
+	if err != nil && s.st.Failed == "" {
+		var ee *exec.ExitError
+		if errors.As(err, &ee) {
+			s.st.Failed = "mpv could not play this"
 		} else {
 			s.st.Failed = err.Error()
 		}
+	}
+	// mpv says why on its output (often yt-dlp's message): show it.
+	if detail := s.out.last(); s.st.Failed != "" && detail != "" {
+		s.st.Failed += ": " + detail
 	}
 }
 
@@ -262,4 +290,49 @@ func (s *Session) handle(line []byte) {
 			}
 		}
 	}
+}
+
+// tail keeps the last lines mpv wrote, so a failure can say why.
+type tail struct {
+	mu  sync.Mutex
+	buf []byte
+}
+
+func (t *tail) Write(p []byte) (int, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.buf = append(t.buf, p...)
+	if len(t.buf) > 4096 {
+		t.buf = t.buf[len(t.buf)-4096:]
+	}
+	return len(p), nil
+}
+
+// last returns the most useful line of output: yt-dlp's own "ERROR:" message
+// if there is one (the last one), else the last non-empty line.
+func (t *tail) last() string {
+	t.mu.Lock()
+	lines := strings.Split(strings.ReplaceAll(string(t.buf), "\r", "\n"), "\n")
+	t.mu.Unlock()
+	best, fallback := "", ""
+	for _, l := range lines {
+		l = strings.TrimSpace(l)
+		if l == "" {
+			continue
+		}
+		fallback = l
+		if strings.Contains(l, "ERROR:") {
+			best = l
+		}
+	}
+	if best == "" {
+		best = fallback
+	}
+	if i := strings.Index(best, "ERROR:"); i >= 0 { // drop "[ytdl_hook] ERROR:"
+		best = strings.TrimSpace(best[i+len("ERROR:"):])
+	}
+	if len(best) > 300 {
+		best = best[:300] + "…"
+	}
+	return best
 }
