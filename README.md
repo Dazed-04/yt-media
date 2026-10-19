@@ -6,7 +6,7 @@ Search by name, paste a raw video URL, preview the thumbnail in full quality (on
 
 ## Demo
 
-| Search & preview                        | Downloading                      |
+| Search                                  | Preview & Play                   |
 | --------------------------------------- | -------------------------------- |
 | ![Search and preview](assets/img-1.png) | ![Downloading](assets/img-2.png) |
 
