@@ -278,7 +278,7 @@ func (m *Model) runningRows(s winStyles, inner int) []string {
 			icon, pct, style = "↓", fmt.Sprintf("%d%%", int(j.Progress*100)), s.green
 		}
 		label := safeTruncate(j.Req.Video.GetDisplayString(), inner-7)
-		rows = append(rows, s.row(inner, style.Render(fmt.Sprintf("%s %-*s %4s", icon, inner-7, label, pct))))
+		rows = append(rows, s.row(inner, style.Render(fmt.Sprintf("%s %s %4s", icon, padRight(label, inner-7), pct))))
 	}
 	if total > maxShown {
 		rows = append(rows, s.row(inner, s.dim.Render(fmt.Sprintf("+%d more downloading", total-maxShown))))

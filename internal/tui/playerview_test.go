@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"charm.land/lipgloss/v2"
+
 	"yt-downloader/internal/config"
 	"yt-downloader/internal/downloader"
 )
@@ -74,5 +76,31 @@ func TestQueueAllSkipsStaged(t *testing.T) {
 	m.queueAll()
 	if len(m.Queue) != 2 || m.Flash != "Nothing to add" {
 		t.Errorf("second run: %d %q", len(m.Queue), m.Flash)
+	}
+}
+
+func TestWideTitlesStayInsideTheirLine(t *testing.T) {
+	title := "VK Blanka  - Vickeblanka / 『Black Catcher』 (official music video)"
+	if got := safeTruncate(title, 30); lipgloss.Width(got) > 30 {
+		t.Errorf("truncated to %d columns, want <= 30: %q", lipgloss.Width(got), got)
+	}
+	if got := safeTruncate("abc", 10); got != "abc" {
+		t.Errorf("short string changed: %q", got)
+	}
+
+	// the queue window's running row must not exceed the window width
+	m := &Model{Width: 100, Height: 30}
+	m.Jobs = []DownloadJob{{Status: StatusDownloading, Progress: 0, Req: DownloadReq{Video: downloader.Video{Title: title, Artist: "VK Blanka"}}}}
+	box := m.renderQueueOverlay()
+	w := lipgloss.Width(strings.Split(box, "\n")[0])
+	for i, l := range strings.Split(box, "\n") {
+		if lipgloss.Width(l) != w {
+			t.Errorf("line %d is %d columns, want %d", i, lipgloss.Width(l), w)
+		}
+	}
+	for _, l := range strings.Split(stripANSI(box), "\n") {
+		if strings.Contains(l, "↓") && !strings.Contains(l, "0%") {
+			t.Errorf("percentage not on the title's line: %q", l)
+		}
 	}
 }

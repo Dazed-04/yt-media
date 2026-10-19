@@ -25,14 +25,33 @@ func wrapLines(value string, width, maxLines int) []string {
 	return lines
 }
 
-// safeTruncate cuts s to maxLen runes.
+// safeTruncate cuts s to at most maxLen terminal columns. Wide characters
+// (CJK, full-width brackets, many emoji) take two columns, so counting runes
+// would let such titles overflow their line.
 func safeTruncate(s string, maxLen int) string {
 	if maxLen <= 0 {
 		return ""
 	}
-	r := []rune(s)
-	if len(r) > maxLen {
-		return string(r[:maxLen])
+	if lipgloss.Width(s) <= maxLen {
+		return s
+	}
+	cols := 0
+	var out []rune
+	for _, r := range s {
+		w := lipgloss.Width(string(r))
+		if cols+w > maxLen {
+			break
+		}
+		out = append(out, r)
+		cols += w
+	}
+	return string(out)
+}
+
+// padRight pads s with spaces to width columns (display width, not runes).
+func padRight(s string, width int) string {
+	if pad := width - lipgloss.Width(s); pad > 0 {
+		return s + strings.Repeat(" ", pad)
 	}
 	return s
 }
