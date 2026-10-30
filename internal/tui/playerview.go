@@ -1,12 +1,10 @@
 package tui
 
 import (
+	"context"
 	"fmt"
-	"log"
 	"os/exec"
 	"strings"
-	"sync"
-	"syscall"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -47,26 +45,67 @@ func (m *Model) startPreview(v downloader.Video) tea.Cmd {
 		return nil
 	}
 	url := "https://www.youtube.com/watch?v=" + v.ID
-	opts := m.Config.DownloadOptions
+	opts := m.Config.DownloadOptions // a copy: the cmd below runs off the UI goroutine
 
 	if m.ChoiceType == "Video" {
-		if err := launchVideoPreview(opts, url); err != nil {
-			return m.flash(err.Error(), true)
+		if _, err := exec.LookPath(opts.Player()); err != nil {
+			return m.flash(opts.Player()+" not found: install it to preview videos", true)
 		}
-		return m.flash("Opened in "+opts.Player(), false)
+		fl := m.flash("Opening video in "+opts.Player()+"…", false)
+		return tea.Batch(fl, func() tea.Msg { return videoPreviewMsg{err: openVideoPreview(opts, url)} })
 	}
 
 	m.closePlayer()
 	s, err := player.Start(player.Options{
-		Binary: opts.Player(),
-		URL:    url,
-		Format: "bestaudio/best",
+		Binary:     opts.Player(),
+		URL:        url,
+		Format:     opts.PreviewAudioSelector(),
+		ExtraArgs:  opts.PreviewArgs(),
+		StreamArgs: opts.PreviewExtraArgs(),
+		StreamWait: opts.PreviewWait(),
+		Mode:       opts.PreviewModeOrDefault(),
+		Client:     opts.PreviewClientOrEmpty(),
 	})
 	if err != nil {
 		return m.flash(err.Error(), true)
 	}
 	m.Player, m.PlayerOpen, m.PlayerTitle = s, true, v.GetDisplayString()
 	return m.playerTick()
+}
+
+// videoPreviewMsg is the outcome of opening a video preview window.
+type videoPreviewMsg struct{ err error }
+
+// Timings for a video preview: resolving the link and waiting for YouTube to
+// accept the stream URL can take a while; after that mpv opens quickly.
+const videoOpenWait = 4 * time.Second
+
+// openVideoPreview has yt-dlp resolve the video's stream URLs, waits until
+// YouTube accepts them, and opens them in mpv's own window. Nothing is
+// downloaded. The preferred client is tried first, then yt-dlp's default. An
+// error means no window opened.
+func openVideoPreview(o config.DownloadOptions, url string) error {
+	clients := []string{o.PreviewClientOrEmpty()}
+	if clients[0] != "" {
+		clients = append(clients, "")
+	}
+	var err error
+	for _, c := range clients {
+		ctx, cancel := context.WithTimeout(context.Background(), o.PreviewWait()+45*time.Second) // + time for yt-dlp itself
+		var st player.Stream
+		st, err = player.Resolve(ctx, player.ResolveOptions{
+			URL: url, Format: o.PreviewVideoSelector(), Client: c, ExtraArgs: o.PreviewExtraArgs(), Wait: o.PreviewWait(),
+		})
+		cancel()
+		if err != nil {
+			continue
+		}
+		args := append([]string{"--msg-level=all=error"}, st.MpvArgs()...)
+		if err = player.LaunchWindow(o.Player(), args, videoOpenWait, nil); err == nil {
+			return nil
+		}
+	}
+	return err
 }
 
 func (m *Model) closePlayer() {
@@ -76,40 +115,6 @@ func (m *Model) closePlayer() {
 	}
 	m.PlayerOpen = false
 	m.playerSeq++ // drop any pending tick
-}
-
-// videoPreviewArgs builds the mpv command line for a video preview window.
-func videoPreviewArgs(o config.DownloadOptions, url string) []string {
-	// No cookies for previews: YouTube gives logged-in requests stream URLs
-	// that mpv can't fetch (HTTP 403). Downloads use cookies_from_browser;
-	// previews stay logged out, and any cookies line in the user's mpv.conf
-	// is dropped.
-	args := []string{"--ytdl-format=" + o.VideoSelector()}
-	args = append(args, player.YtdlCookieArgs("")...)
-	return append(args, "--", url)
-}
-
-// launchVideoPreview starts mpv in its own window, detached from the TUI so
-// it keeps playing however the TUI is used (or closed) afterwards.
-func launchVideoPreview(o config.DownloadOptions, url string) error {
-	bin := o.Player()
-	path, err := exec.LookPath(bin)
-	if err != nil {
-		return fmt.Errorf("%s not found: install it to preview videos", bin)
-	}
-	cmd := exec.Command(path, videoPreviewArgs(o, url)...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-	var out lockedBuf
-	cmd.Stdout, cmd.Stderr = &out, &out
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-	go func() { // reap it when the window closes; a failure goes to the log
-		if err := cmd.Wait(); err != nil {
-			log.Printf("[PREVIEW] %s exited: %v: %s", bin, err, strings.TrimSpace(out.String()))
-		}
-	}()
-	return nil
 }
 
 // ---------- keys ----------
@@ -180,6 +185,8 @@ func (m *Model) renderPlayerOverlay() string {
 		status = "Error"
 	case st.Ended:
 		status = "Finished"
+	case st.Preparing:
+		status = "Fetching"
 	case st.Buffering:
 		status = "Buffering"
 	case st.Paused:
@@ -199,6 +206,8 @@ func (m *Model) renderPlayerOverlay() string {
 		for _, ln := range wrapLines(st.Failed, inner, 3) {
 			rows = append(rows, s.row(inner, s.red.Render(strings.TrimRight(ln, " "))))
 		}
+	} else if st.Preparing {
+		rows = append(rows, s.row(inner, s.dim.Render("getting the track…")))
 	} else {
 		left, right := fmtClock(st.Pos), "--:--"
 		if st.Dur > 0 {
@@ -214,25 +223,4 @@ func (m *Model) renderPlayerOverlay() string {
 
 	hints := [][]string{{"space: pause", "←/→: seek 5s", "↑/↓: volume", "esc: close"}}
 	return windowBox(s, w, header, [][]string{rows}, hints)
-}
-
-// lockedBuf collects a detached process's output for the log.
-type lockedBuf struct {
-	mu sync.Mutex
-	b  []byte
-}
-
-func (l *lockedBuf) Write(p []byte) (int, error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if len(l.b) < 8192 {
-		l.b = append(l.b, p...)
-	}
-	return len(p), nil
-}
-
-func (l *lockedBuf) String() string {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	return string(l.b)
 }

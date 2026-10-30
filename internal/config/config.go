@@ -29,7 +29,7 @@ type Config struct {
 	FetchLyrics           bool     `json:"fetch_lyrics"`            // look up lyrics after each download
 	LyricsDir             string   `json:"lyrics_dir"`              // blank = <music_dir>/lyrics
 	LyricsExclude         []string `json:"lyrics_exclude"`          // paths skipped only by lyrics tagger
-	MusicExclude          []string `json:"music_excluse"`           // paths (relative to music_dir) to skip for album & lyrics
+	MusicExclude          []string `json:"music_exclude"`           // paths (relative to music_dir) to skip for album & lyrics
 	LyricsForVideo        bool     `json:"lyrics_for_video"`        // write .srt subtitles next to videos
 	LyricsFallbackCommand string   `json:"lyrics_fallback_command"` // optional, tried when LRCLIB has nothing
 }
@@ -108,7 +108,7 @@ func stripComments(data []byte) []byte {
 }
 
 const defaultTemplate = `{
-	// Number of simultaneous yt-dlp downloads.
+  // Number of simultaneous yt-dlp downloads.
   "max_workers": 3,
 
   // "Audio" or "Video" — the default selected on startup.
@@ -141,6 +141,14 @@ const defaultTemplate = `{
   // download and written into the file's tags (only if the file has none).
   "fetch_album": true,
 
+  // Paths (relative to music_dir) to skip when looking up albums, matched as
+  // prefixes.
+  "album_exclude": [],
+
+  // Paths (relative to music_dir) to leave out of library-wide commands,
+  // matched as prefixes.
+  "music_exclude": [],
+
   // Look up synced lyrics (LRCLIB) after each audio download and save them
   // as .lrc files. "yt-media lyrics" does the same for your whole library.
   "fetch_lyrics": true,
@@ -156,7 +164,8 @@ const defaultTemplate = `{
   // Use a browser's cookies, e.g. "firefox" or "chrome" (yt-dlp's
   // --cookies-from-browser). Helps with age-restricted videos and with
   // YouTube asking you to sign in. Blank = off. Used for downloads, size
-  // lookups, playlists and previews.
+  // lookups, playlists and previews that are downloaded first (never for
+  // streamed previews).
   "cookies_from_browser": "",
 
   // Audio downloads only: cut non-music parts using SponsorBlock categories,
@@ -166,6 +175,32 @@ const defaultTemplate = `{
 
   // The program used for previews.
   "preview_player": "mpv",
+
+  // How audio previews play: "download" fetches the track first (slower
+  // start, most reliable), "stream" asks yt-dlp for the stream URL,
+	// waits until YouTube accepts it (a few seconds),
+	// then plays it, "auto" streams and falls back to a download.
+  // Video previews always stream in mpv's window.
+  "preview_mode": "auto",
+
+  // Preferred YouTube client for previews, e.g. "web_safari". If it fails,
+  // yt-dlp's default client is used instead. Blank = default.
+  "preview_client": "",
+
+	// Extra seconds a streamed preview waits for YouTube to accept the stream URL,
+	// on top of a 5-second base (YouTube refuses the URL for the first several seconds).
+	// 0 or blank = just the 5 seconds; negative values count as 0;
+	// the total is capped at 5 minutes.
+  "preview_wait_seconds": 0,
+
+  // Advanced: yt-dlp format selectors for previews. Blank = automatic
+  // (audio: bestaudio/best; video: follows max_video_height, else 1080p).
+  "preview_audio_format": "",
+  "preview_video_format": "",
+
+  // Advanced: extra yt-dlp arguments,
+	// Example: ["--extractor-args", "youtube:player_client=web_safari"]
+  "preview_ytdlp_args": [],
 
   // Where .lrc files go. Blank = a "lyrics" folder inside music_dir, mirroring
   // its folder structure.

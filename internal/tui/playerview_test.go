@@ -1,8 +1,13 @@
 package tui
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"charm.land/lipgloss/v2"
 
@@ -34,30 +39,6 @@ func TestFmtClockAndBar(t *testing.T) {
 	}
 	if on, _ = progressBar(999, 100, 10); len([]rune(on)) != 10 {
 		t.Error("bar overflows past the end")
-	}
-}
-
-func TestVideoPreviewArgs(t *testing.T) {
-	o := config.DefaultDownloadOptions()
-	o.MaxVideoHeight = 1080
-	o.CookiesFromBrowser = "chrome"
-	got := strings.Join(videoPreviewArgs(o, "https://x/y"), " ")
-	for _, w := range []string{"--ytdl-format=bestvideo[height<=1080]+bestaudio/best[height<=1080]", "--ytdl-raw-options-remove=cookies-from-browser", "-- https://x/y"} {
-		if !strings.Contains(got, w) {
-			t.Errorf("missing %q in %s", w, got)
-		}
-	}
-}
-
-func TestPreviewNeverUsesCookies(t *testing.T) {
-	o := config.DefaultDownloadOptions()
-	o.CookiesFromBrowser = "firefox:/home/u/.zen/abc.Default (release)"
-	got := strings.Join(videoPreviewArgs(o, "https://x/y"), " ")
-	if strings.Contains(got, "cookies-from-browser=") || strings.Contains(got, "-add=") {
-		t.Errorf("preview passes cookies: %s", got)
-	}
-	if !strings.Contains(got, "--ytdl-raw-options-remove=cookies-from-browser") {
-		t.Errorf("preview should still drop mpv.conf's cookies: %s", got)
 	}
 }
 
@@ -115,4 +96,101 @@ func TestWideTitlesStayInsideTheirLine(t *testing.T) {
 			t.Errorf("percentage not on the title's line: %q", l)
 		}
 	}
+}
+
+// fakeTools puts stand-in mpv and yt-dlp scripts first on PATH.
+func fakeTools(t *testing.T, ytdlp, mpv string) {
+	t.Helper()
+	dir := t.TempDir()
+	for name, body := range map[string]string{"yt-dlp": ytdlp, "mpv": mpv} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("#!/bin/sh\n"+body+"\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", dir+":"+os.Getenv("PATH"))
+}
+
+// streamURL serves 206 to everything, like a stream URL that is ready.
+func streamURL(t *testing.T) string {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusPartialContent) }))
+	t.Cleanup(srv.Close)
+	return srv.URL + "/videoplayback"
+}
+
+// ytdlpStream is a fake yt-dlp that describes a stream at url, and logs its arguments.
+func ytdlpStream(url, log string) string {
+	return `echo "$@" >> ` + log + `
+printf '{"title":"Vid","requested_formats":[{"url":"` + url + `","vcodec":"avc1","acodec":"none"},{"url":"` + url + `","vcodec":"none","acodec":"opus"}]}\n'`
+}
+
+func TestVideoPreviewReportsWhenMpvFailsToOpen(t *testing.T) {
+	fakeTools(t, ytdlpStream(streamURL(t), os.DevNull), "echo 'Failed to open the file' >&2; exit 2")
+	err := openVideoPreview(config.DefaultDownloadOptions(), "https://x/y")
+	if err == nil || !strings.Contains(err.Error(), "Failed to open") {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func TestVideoPreviewReportsResolveFailure(t *testing.T) {
+	fakeTools(t, "echo 'ERROR: Video unavailable' >&2; exit 1", "sleep 1")
+	err := openVideoPreview(config.DefaultDownloadOptions(), "https://x/y")
+	if err == nil || !strings.Contains(err.Error(), "Video unavailable") {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func TestVideoPreviewStreamsTheResolvedUrls(t *testing.T) {
+	dir := t.TempDir()
+	argsFile, ytLog := filepath.Join(dir, "args"), filepath.Join(dir, "yt")
+	url := streamURL(t)
+	fakeTools(t, ytdlpStream(url, ytLog), "printf '%s\\n' \"$@\" > "+argsFile+"; sleep 1")
+	o := config.DefaultDownloadOptions()
+	o.MaxVideoHeight = 1440
+	if err := openVideoPreview(o, "https://x/y"); err != nil {
+		t.Fatal(err)
+	}
+	if got := readFile(t, ytLog); !strings.Contains(got, "bestvideo[height<=1440]+bestaudio/best[height<=1440]") || strings.Contains(got, "cookies") {
+		t.Errorf("yt-dlp args = %q", got)
+	}
+	got := readFile(t, argsFile)
+	for _, w := range []string{"--ytdl=no", "--force-media-title=Vid", "--audio-file=" + url, "--\n" + url} {
+		if !strings.Contains(got, w) {
+			t.Errorf("mpv args lack %q:\n%s", w, got)
+		}
+	}
+}
+
+func TestVideoPreviewFallsBackToDefaultClient(t *testing.T) {
+	dir := t.TempDir()
+	log := filepath.Join(dir, "yt")
+	url := streamURL(t)
+	fakeTools(t, `case "$*" in *player_client*) echo "$@" >> `+log+`; echo "ERROR: client refused" >&2; exit 1;; esac
+`+ytdlpStream(url, log), "sleep 1")
+	o := config.DefaultDownloadOptions()
+	o.PreviewClient = "web_safari"
+	if err := openVideoPreview(o, "https://x/y"); err != nil {
+		t.Fatalf("fallback failed: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(readFile(t, log)), "\n")
+	if len(lines) != 2 || !strings.Contains(lines[0], "player_client=web_safari") || strings.Contains(lines[1], "player_client") {
+		t.Errorf("attempts = %q", lines)
+	}
+	// every client failing: the error is reported, not swallowed
+	fakeTools(t, "echo 'ERROR: client refused' >&2; exit 1", "sleep 1")
+	if err := openVideoPreview(o, "https://x/y"); err == nil || !strings.Contains(err.Error(), "client refused") {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func readFile(t *testing.T, p string) string {
+	t.Helper()
+	for i := 0; i < 100; i++ {
+		if b, err := os.ReadFile(p); err == nil && len(b) > 0 {
+			return string(b)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("%s never written", p)
+	return ""
 }

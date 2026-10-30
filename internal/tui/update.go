@@ -54,6 +54,12 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case playerTickMsg:
 		return m, m.onPlayerTick(msg)
 
+	case videoPreviewMsg:
+		if msg.err != nil {
+			return m, m.flash("Preview failed: "+msg.err.Error(), true)
+		}
+		return m, m.flash("Playing in "+m.Config.Player(), false)
+
 	case blinkMsg:
 		if m.Searching {
 			m.Blink = !m.Blink

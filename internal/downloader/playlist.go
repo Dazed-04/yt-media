@@ -56,7 +56,7 @@ func FetchPlaylist(id string, limit int, cookies []string) ([]Video, error) {
 
 func parsePlaylist(out string) []Video {
 	var vids []Video
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
