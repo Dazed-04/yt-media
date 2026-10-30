@@ -31,7 +31,7 @@ Search by name, paste a raw video URL, preview the thumbnail in full quality (on
 - [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) on your `PATH`
 - [`ffmpeg`](https://ffmpeg.org/) (used by yt-dlp for audio extraction/embedding; its `ffprobe` is also used to read tags for lyrics)
 - [Kitty terminal](https://sw.kovidgoyal.net/kitty/) for high-resolution thumbnail previews. Other terminals get an ANSI fallback, but Kitty is what this is built and tested on.
-- Optional: [`mpv`](https://mpv.io/) for the `p` preview (it uses `yt-dlp` to stream, so both must be installed)
+- Optional: [`mpv`](https://mpv.io/) for the `p` preview (`yt-dlp` finds the stream, so both must be installed)
 - Optional: `python-mutagen` (Arch; `pip install mutagen` elsewhere) if you pick `opus` or `flac`, so yt-dlp can embed cover art in those formats
 - Optional: `notify-send` (Linux) or `osascript` (macOS, built-in) for batch-completion notifications
 - For macOS: brew install mpv yt-dlp ffmpeg (optional: kitty, for high quality image rendering)
@@ -100,6 +100,14 @@ On first run, a default config is written to:
   // download and written into the file's tags (only if the file has none).
   "fetch_album": true,
 
+  // Paths (relative to music_dir) to skip when looking up albums, matched as
+  // prefixes.
+  "album_exclude": [],
+
+  // Paths (relative to music_dir) to leave out of library-wide commands,
+  // matched as prefixes.
+  "music_exclude": [],
+
   // Look up synced lyrics (LRCLIB) after each audio download and save them
   // as .lrc files. "yt-media lyrics" does the same for your whole library.
   "fetch_lyrics": true,
@@ -109,13 +117,14 @@ On first run, a default config is written to:
   "audio_format": "mp3",
 
   // Cap video downloads (and video previews) at this height, e.g. 1080.
-  // 0 = best available.
+  // 0 = best available. (int not string)
   "max_video_height": 0,
 
   // Use a browser's cookies, e.g. "firefox" or "chrome" (yt-dlp's
   // --cookies-from-browser). Helps with age-restricted videos and with
   // YouTube asking you to sign in. Blank = off. Used for downloads, size
-  // lookups, playlists.
+  // lookups, playlists and previews that are downloaded first (never for
+  // streamed previews).
   "cookies_from_browser": "",
 
   // Audio downloads only: cut non-music parts using SponsorBlock categories,
@@ -125,6 +134,32 @@ On first run, a default config is written to:
 
   // The program used for previews.
   "preview_player": "mpv",
+
+  // How audio previews play: "download" fetches the track first (slower
+  // start, most reliable), "stream" asks yt-dlp for the stream URL,
+  // waits until YouTube accepts it (a few seconds),
+  // then plays it, "auto" streams and falls back to a download.
+  // Video previews always stream in mpv's window.
+  "preview_mode": "auto",
+
+  // Preferred YouTube client for previews, e.g. "web_safari". If it fails,
+  // yt-dlp's default client is used instead. Blank = default.
+  "preview_client": "",
+
+  // Extra seconds a streamed preview waits for YouTube to accept the stream URL,
+  // on top of a 5-second base (YouTube refuses the URL for the first several seconds).
+  // 0 or blank = just the 5 seconds; negative values count as 0;
+  // the total is capped at 5 minutes.
+  "preview_wait_seconds": 0,
+
+  // Advanced: yt-dlp format selectors for previews. Blank = automatic
+  // (audio: bestaudio/best; video: follows max_video_height, else 1080p).
+  "preview_audio_format": "",
+  "preview_video_format": "",
+
+  // Advanced: extra yt-dlp arguments,
+  // Example: ["--extractor-args", "youtube:player_client=web_safari"]
+  "preview_ytdlp_args": [],
 
   // Where .lrc files go. Blank = a "lyrics" folder inside music_dir, mirroring
   // its folder structure.
@@ -144,6 +179,8 @@ On first run, a default config is written to:
 ```
 
 Full-line `//` comments are allowed. Edit the file and restart — no rebuild required.
+A config you already have is never rewritten, so new options won’t appear in it.
+Copy them from the block above.
 
 ### Higher-resolution previews via Kitty font shrinking (optional)
 
@@ -165,10 +202,26 @@ This is entirely optional — leaving it at `0` (or not enabling remote control)
 
 Press `p` on a result to try it before downloading.
 
-- **Audio mode** — a small player window opens over the list with the title, a progress bar, the time and the volume. A hidden `mpv` does the playing and the interface controls it. Keys: `space` pause/resume, `←`/`→` seek 5 seconds (`H`/`L` for 30), `↑`/`↓` volume, `esc`/`q`/`p` close and stop playback.
-- **Video mode** (the default type is shown in the footer; switch with `tab`) — `mpv` opens its own window and plays picture and sound there. It runs separately, so closing the interface doesn't stop it.
+- **Audio mode** — a small player window opens over the list with the title, a progress bar, the time and the volume. A hidden `mpv` does the playing and the interface controls it. Keys: `space` pause/resume, `←`/`→` seek 5 seconds (`H`/`L` for 30), `↑`/`↓` volume, `esc`/`q`/`p` close and stop playback. The window says **Fetching** until playback starts.
+- **Video mode** (the default type is shown in the footer; switch with `tab`) — `mpv` opens its own window and streams picture and sound there; nothing is downloaded. It runs separately, so closing the interface doesn't stop it. If the video can't be opened, the footer shows `Preview failed:` and the reason.
 
 Both modes need `mpv` and `yt-dlp` installed. If `mpv` isn't found, the footer says so. Your own `mpv.conf` is respected.
+
+### How previews play
+
+Since yt-dlp 2026.10.21, YouTube refuses a new stream URL for its first few seconds, which makes mpv fail with `HTTP error 403`. Streamed previews therefore ask yt-dlp for the URL, wait until YouTube accepts it, and only then start `mpv`. Audio previews can also download the track first:
+
+| `preview_mode` | What happens                                                                        |
+| -------------- | ----------------------------------------------------------------------------------- |
+| `download`     | Download the track to a temporary file, then play it. Slowest start, most reliable. |
+| `stream`       | Resolve the stream URL, wait until it works, then play it.                          |
+| `auto`         | Try `stream`, and fall back to `download` if it fails.                              |
+
+- `preview_client` sets a preferred YouTube client (for example `web_safari`). If it fails, yt-dlp's default client is used instead.
+- `preview_wait_seconds` is how many seconds are added to the 5-second base wait for YouTube to accept the stream URL. If previews fail with `the stream was still refused`, raise it (10 is a good start) or use `auto`.
+- `preview_audio_format`, `preview_video_format` and `preview_ytdlp_args` let you override yt-dlp's format selection and add arguments without rebuilding.
+- Cookies (`cookies_from_browser`) are only used for previews that are downloaded first, never for streamed ones.
+- Video previews follow `max_video_height` (1080p when it is 0).
 
 ## Lyrics
 
@@ -179,7 +232,7 @@ With `fetch_lyrics` on (the default), every finished **audio** download gets syn
 ```
 
 - **Matching** — song titles are messy, so several spellings are tried: the title as-is, then without `(Official Video)`-style decoration, then without `feat.`/`ft.` credits, plus `Artist - Title` uploads are split apart. A result is only accepted if the artist matches and its length is within a few seconds of your file, so you don't get the lyrics of a live or extended version.
-- **Skipped automatically** — files that already have an `.lrc` with real lyrics (an `.lrc` holding only a spinner/🎵 placeholder from a failed lookup counts as missing and is retried), files that carry embedded lyrics, and anything under a `lyrics_exclude` path.
+- **Skipped automatically** — files that already have an `.lrc` with real lyrics (an `.lrc` holding only a spinner/🎵 placeholder from a failed lookup counts as missing and is retried), files that carry embedded lyrics, and anything under a `lyrics_exclude` or `music_exclude` path.
 - **Never blocks a download** — if lyrics can't be found you'll see a short "No lyrics found" note, and the download still counts as done. Details are in `~/.cache/yt-media/debug.log`.
 - **Videos** — set `lyrics_for_video` to also write a `.srt` subtitle file next to downloaded videos (players like mpv and VLC load it automatically). Videos that already have subtitles are skipped. Music videos often differ in length from the studio track, so expect fewer matches than for audio.
 - **Extra source** — `lyrics_fallback_command` runs your own command when LRCLIB has nothing, e.g. [`syncedlyrics`](https://github.com/moehmeni/syncedlyrics).
@@ -215,6 +268,7 @@ YouTube usually doesn't know which album a song is on, so players show "Unknown 
 - Songs MusicBrainz doesn't know stay untagged, and are filed under `Unknown Album`.
 - Both LRCLIB and MusicBrainz limit how fast they can be asked. Requests are spaced out, "429/503 - slow down" answers are waited out (honouring `Retry-After`) and retried, and a scan stops with a clear message if a service keeps refusing; just run it again later, finished songs are skipped.
 - For songs you already have, run `yt-media album` (about one song per second, MusicBrainz's limit). If you use `mpd`, update its database afterwards (`mpc update`).
+- Paths under album_exclude or music_exclude are skipped.
 
 ## Keybindings
 
@@ -280,12 +334,15 @@ The list shows failed items first, then queued items, under a single cursor.
 - yt-dlp reports where each file ended up (`--print-to-file after_move:filepath`), which is how lyrics are attached to the right file.
 - A yt-dlp `--download-archive` file tracks completed video IDs so repeat searches don't redownload existing files.
 - Your queue and any failed downloads are saved to `~/.cache/yt-media/queue.json`, so they're still there next time you launch.
+- Previews use yt-dlp too: it either downloads the track to a temporary file, or resolves a stream URL that is checked to be accepted by YouTube before `mpv` plays it. Temporary files are deleted when the preview closes.
 
 ## Troubleshooting
 
 - **`HTTP Error 403: Forbidden`** — YouTube changes often, and an outdated yt-dlp is the usual cause. Update it (`yt-dlp -U`, or through your package manager) and retry with `r`.
 - **"Network unavailable"** — yt-dlp couldn't reach YouTube. Check your connection and retry.
 - **Preview says `mpv not found`** — install `mpv` (it needs `yt-dlp` too), or set `preview_player` to another mpv-compatible program.
+- **Preview fails with `HTTP error 403` or `the stream was still refused`** — YouTube refuses stream URLs for the first few seconds. Raise `preview_wait_seconds`, set `preview_mode` to `"auto"` or `"download"`, or try a different `preview_client`.
+- **Preview fails right away** — update `yt-dlp` and `mpv`, then check `~/.cache/yt-media/debug.log` for the real message.
 - **YouTube asks you to sign in / age-restricted video** — set `cookies_from_browser` to a browser you're logged into, e.g. `"firefox"`.
 - **Anything else** — open the error window (`e`) and press `enter` for the full yt-dlp output. Everything is also logged to `~/.cache/yt-media/debug.log` (run `yt-media paths` to see it).
 
