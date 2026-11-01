@@ -44,7 +44,7 @@ func (m *Model) startPreview(v downloader.Video) tea.Cmd {
 	if v.ID == "" {
 		return nil
 	}
-	url := "https://www.youtube.com/watch?v=" + v.ID
+	url := v.URL()
 	opts := m.Config.DownloadOptions // a copy: the cmd below runs off the UI goroutine
 
 	if m.ChoiceType == "Video" {

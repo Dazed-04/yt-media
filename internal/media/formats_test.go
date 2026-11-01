@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -40,6 +41,13 @@ func coverStreams(t *testing.T, path string) int {
 // tags, the way yt-dlp leaves downloads.
 func makeWithCover(t *testing.T, ext string) (path string, cover []byte) {
 	t.Helper()
+	return makeWithCoverFor(t, ext, 1)
+}
+
+// makeWithCoverFor is makeWithCover with a chosen length in seconds.
+func makeWithCoverFor(t *testing.T, ext string, secs int) (path string, cover []byte) {
+	t.Helper()
+	sine := "sine=d=" + strconv.Itoa(secs)
 	needFFmpeg(t)
 	dir := t.TempDir()
 	coverPath := filepath.Join(dir, "cover.jpg")
@@ -54,10 +62,10 @@ func makeWithCover(t *testing.T, ext string) (path string, cover []byte) {
 		os.WriteFile(meta, []byte(ffmetadata(map[string]string{
 			"artist": "Ace Hood", "title": "We Ball", "metadata_block_picture": pictureBlock(cover),
 		})), 0o644)
-		ff(t, "-f", "lavfi", "-i", "sine=d=1", "-f", "ffmetadata", "-i", meta, "-map", "0:a", "-map_metadata", "1", "-c:a", "libopus", path)
+		ff(t, "-f", "lavfi", "-i", sine, "-f", "ffmetadata", "-i", meta, "-map", "0:a", "-map_metadata", "1", "-c:a", "libopus", path)
 	default:
 		codec := map[string]string{".flac": "flac", ".m4a": "aac", ".mp3": "libmp3lame"}[ext]
-		ff(t, "-f", "lavfi", "-i", "sine=d=1", "-i", coverPath, "-map", "0", "-map", "1", "-c:a", codec, "-c:v", "mjpeg",
+		ff(t, "-f", "lavfi", "-i", sine, "-i", coverPath, "-map", "0", "-map", "1", "-c:a", codec, "-c:v", "mjpeg",
 			"-disposition:v", "attached_pic", "-metadata", "artist=Ace Hood", "-metadata", "title=We Ball", path)
 	}
 	if coverStreams(t, path) != 1 {

@@ -172,7 +172,13 @@ const defaultTemplate = `{
   // comma-separated, e.g. "music_offtopic" or "sponsor,intro,outro".
   // Blank = off.
   "sponsorblock_remove": "",
-
+  
+	// Audio only: cut a long upload (an album or soundtrack in one video) into
+  // one file per chapter, filed under Artist/Album and tagged with each
+  // chapter's title and number. Videos without chapters are left as one file.
+  // Each piece is looked up for lyrics as its own song.
+  "split_chapters": false,
+	
   // The program used for previews.
   "preview_player": "mpv",
 

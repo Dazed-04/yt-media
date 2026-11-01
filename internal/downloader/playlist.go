@@ -1,6 +1,8 @@
 package downloader
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os/exec"
@@ -56,7 +58,7 @@ func FetchPlaylist(id string, limit int, cookies []string) ([]Video, error) {
 
 func parsePlaylist(out string) []Video {
 	var vids []Video
-	for line := range strings.SplitSeq(out, "\n") {
+	for _, line := range strings.Split(out, "\n") {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
@@ -95,4 +97,94 @@ func clock(sec float64) string {
 		return fmt.Sprintf("%d:%02d:%02d", h, s%3600/60, s%60)
 	}
 	return fmt.Sprintf("%d:%02d", s/60, s%60)
+}
+
+type genericEntry struct {
+	ID            string  `json:"id"`
+	Title         string  `json:"title"`
+	Artist        string  `json:"artist"`
+	Track         string  `json:"track"`
+	Album         string  `json:"album"`
+	Uploader      string  `json:"uploader"`
+	Channel       string  `json:"channel"`
+	DurationStr   string  `json:"duration_string"`
+	Duration      float64 `json:"duration"`
+	Thumbnail     string  `json:"thumbnail"`
+	WebpageURL    string  `json:"webpage_url"`
+	URL           string  `json:"url"`
+	PlaylistTitle string  `json:"playlist_title"`
+	Thumbnails    []struct {
+		URL string `json:"url"`
+	} `json:"thumbnails"`
+}
+
+// FetchURL lists what a link from any site yt-dlp supports points to: one
+// item for a single video or track, several for an album or playlist (at
+// most limit). Only listings are read, so playlist entries carry what the
+// listing has. cookies are extra yt-dlp arguments.
+func FetchURL(link string, limit int, cookies []string) ([]Video, error) {
+	args := []string{"--dump-json", "--flat-playlist", "--skip-download", "--playlist-end", fmt.Sprint(max(limit, 1))}
+	args = append(args, cookies...)
+	args = append(args, "--", link)
+	out, err := exec.Command("yt-dlp", args...).Output()
+	if err != nil {
+		return nil, cmdError(err)
+	}
+	vids := parseGeneric(string(out), link)
+	if len(vids) == 0 {
+		return nil, fmt.Errorf("nothing found at that link")
+	}
+	return vids, nil
+}
+
+func parseGeneric(out, link string) []Video {
+	var vids []Video
+	for _, line := range strings.Split(out, "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		var e genericEntry
+		if json.Unmarshal([]byte(line), &e) != nil {
+			continue
+		}
+		page := e.WebpageURL
+		if page == "" && (strings.HasPrefix(e.URL, "http://") || strings.HasPrefix(e.URL, "https://")) {
+			page = e.URL
+		}
+		if page == "" {
+			page = link
+		}
+		id := e.ID
+		if id == "" {
+			sum := sha1.Sum([]byte(page))
+			id = hex.EncodeToString(sum[:6])
+		}
+		v := Video{
+			ID: id, Title: firstNonBlank(e.Title, page), Artist: e.Artist, Track: e.Track, Album: e.Album,
+			Uploader: e.Uploader, Channel: e.Channel, Duration: e.DurationStr, Thumbnail: e.Thumbnail,
+			WebpageURL: page,
+		}
+		if v.Duration == "" {
+			v.Duration = clock(e.Duration)
+		}
+		if v.Thumbnail == "" {
+			if n := len(e.Thumbnails); n > 0 {
+				v.Thumbnail = e.Thumbnails[n-1].URL
+			}
+		}
+		if v.Artist == "" {
+			v.Artist = songname.CleanArtist(songname.FirstNonEmpty(e.Uploader, e.Channel))
+		}
+		vids = append(vids, v)
+	}
+	return vids
+}
+
+func firstNonBlank(vals ...string) string {
+	for _, s := range vals {
+		if strings.TrimSpace(s) != "" {
+			return s
+		}
+	}
+	return ""
 }

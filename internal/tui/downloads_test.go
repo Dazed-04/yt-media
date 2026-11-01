@@ -7,8 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
 	"yt-downloader/internal/config"
 	"yt-downloader/internal/downloader"
+	"yt-downloader/internal/lyrics"
 	"yt-downloader/internal/media"
 )
 
@@ -103,13 +105,14 @@ func fakeYtdlp(t *testing.T) {
 while [ $# -gt 0 ]; do
   case "$1" in
     -o) out="$2"; shift ;;
-    --print-to-file) pathfile="$3"; shift 2 ;;
+    --print-to-file) case "$2" in *chapters*) chapfile="$3" ;; *) pathfile="$3" ;; esac; shift 2 ;;
   esac
   shift
 done
 file=$(printf '%s' "$out" | sed 's/%(title)s/Video Title/; s/%(ext)s/mp3/; s/%%/%/g')
 mkdir -p "$(dirname "$file")"
-ffmpeg -v quiet -y -f lavfi -i sine=d=1 "$file" || exit 1
+ffmpeg -v quiet -y -f lavfi -i sine=d=${FAKE_SECS:-1} "$file" || exit 1
+[ -n "$chapfile" ] && printf '%s\n' "${FAKE_CHAPTERS:-NA}" > "$chapfile"
 [ -n "$pathfile" ] && printf '%s\n' "$file" > "$pathfile"
 echo "[download] 100% of 1MiB"
 `
@@ -204,5 +207,127 @@ func TestArgsHonourDownloadOptions(t *testing.T) {
 	got = joined(def.args("/d", ""))
 	if !strings.Contains(got, " --audio-format mp3 ") || strings.Contains(got, "cookies") || strings.Contains(got, "sponsorblock") {
 		t.Errorf("default args: %s", got)
+	}
+}
+
+const threeChapters = `[{"start_time": 0, "end_time": 2, "title": "01. Opening"}, {"start_time": 2, "end_time": 4, "title": "Boss Battle"}, {"start_time": 4, "end_time": 5.9, "title": "Ending"}]`
+
+func splitParams(t *testing.T, home string, split bool) downloadParams {
+	t.Helper()
+	p := downloadParams{
+		req:      DownloadReq{Type: "Audio", Video: downloader.Video{ID: "abc", Title: "Game OST (Full Album)", Channel: "Composer - Topic"}},
+		cfg:      config.Config{MusicDir: filepath.Join(home, "Music")},
+		home:     home,
+		archive:  filepath.Join(home, "archive.txt"),
+		progress: make(chan JobProgressMsg, 16),
+	}
+	p.cfg.SplitChapters = split
+	return p
+}
+
+func TestSplitChaptersFilesEachTrackAndLooksUpLyricsPerTrack(t *testing.T) {
+	fakeYtdlp(t)
+	t.Setenv("FAKE_SECS", "6")
+	t.Setenv("FAKE_CHAPTERS", threeChapters)
+	home := t.TempDir()
+	p := splitParams(t, home, true)
+	p.fetchLyrics = true
+
+	type ask struct {
+		file string
+		t    lyrics.Track
+	}
+	var asked []ask
+	old := ensureLyricsFn
+	ensureLyricsFn = func(_ lyrics.Options, _ lyrics.Kind, file string, tr lyrics.Track) lyrics.Outcome {
+		asked = append(asked, ask{file, tr})
+		return lyrics.NotFound
+	}
+	defer func() { ensureLyricsFn = old }()
+
+	msg := p.run()
+	if msg.Err != nil {
+		t.Fatal(msg.Err)
+	}
+	dir := filepath.Join(home, "Music", "Composer", "Game OST")
+	entries, _ := os.ReadDir(dir)
+	var names []string
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	if strings.Join(names, "|") != "01 - Opening.mp3|02 - Boss Battle.mp3|03 - Ending.mp3" {
+		t.Fatalf("files in %s = %v (the original must be gone)", dir, names)
+	}
+	if _, err := os.Stat(filepath.Join(home, "Music", "Composer", "Unknown Album")); err == nil {
+		t.Error("the empty Unknown Album folder was left behind")
+	}
+	in, err := media.Probe(context.Background(), filepath.Join(dir, "02 - Boss Battle.mp3"))
+	if err != nil || in.Tags["title"] != "Boss Battle" || in.Tags["album"] != "Game OST" || in.Tags["artist"] != "Composer" {
+		t.Errorf("tags = %v (%v)", in.Tags, err)
+	}
+	// every piece is its own song for the lyrics lookup
+	if len(asked) != 3 {
+		t.Fatalf("lyrics asked %d times, want 3", len(asked))
+	}
+	if a := asked[1]; a.t.Title != "Boss Battle" || a.t.Artist != "Composer" || a.t.Duration != 2 || !strings.HasSuffix(a.file, "02 - Boss Battle.mp3") {
+		t.Errorf("second lookup = %+v", a)
+	}
+	if !msg.LyricsMissing {
+		t.Error("no lyrics for any piece should be reported")
+	}
+}
+
+func TestSplitIsOffByDefaultAndSkippedWithoutChapters(t *testing.T) {
+	fakeYtdlp(t)
+	t.Setenv("FAKE_SECS", "6")
+	// off: one file even though the video has chapters
+	t.Setenv("FAKE_CHAPTERS", threeChapters)
+	home := t.TempDir()
+	if msg := splitParams(t, home, false).run(); msg.Err != nil {
+		t.Fatal(msg.Err)
+	}
+	if _, err := os.Stat(filepath.Join(home, "Music", "Composer", "Unknown Album", "Video Title.mp3")); err != nil {
+		t.Errorf("split off, but: %v", err)
+	}
+	// on, but the video has no chapters: also one file
+	t.Setenv("FAKE_CHAPTERS", "NA")
+	home = t.TempDir()
+	if msg := splitParams(t, home, true).run(); msg.Err != nil {
+		t.Fatal(msg.Err)
+	}
+	if _, err := os.Stat(filepath.Join(home, "Music", "Composer", "Unknown Album", "Video Title.mp3")); err != nil {
+		t.Errorf("no chapters, but: %v", err)
+	}
+}
+
+func TestSplitAsksYtDlpForChaptersOnlyWhenOn(t *testing.T) {
+	p := downloadParams{req: DownloadReq{Type: "Audio", Video: downloader.Video{ID: "abcdefghijk"}}}
+	if strings.Contains(joined(p.args("/d", "")), "chapters") {
+		t.Error("chapters requested while split_chapters is off")
+	}
+	p.chaptersFile = "/tmp/c.json"
+	if !strings.Contains(joined(p.args("/d", "")), " after_move:%(chapters)j /tmp/c.json ") {
+		t.Errorf("args: %s", joined(p.args("/d", "")))
+	}
+}
+
+func TestDownloadUsesTheItemsOwnLink(t *testing.T) {
+	p := downloadParams{req: DownloadReq{Type: "Audio", Video: downloader.Video{ID: "1", WebpageURL: "https://example.bandcamp.com/track/x"}}}
+	a := p.args("/d", "")
+	if a[len(a)-2] != "--" || a[len(a)-1] != "https://example.bandcamp.com/track/x" {
+		t.Errorf("tail = %v", a[len(a)-2:])
+	}
+}
+
+func TestAlbumFromTitle(t *testing.T) {
+	for in, want := range map[string]string{
+		"Game OST (Full Album)":           "Game OST",
+		"Hollow Knight - Full Soundtrack": "Hollow Knight",
+		"Some Anime OST [Complete OST]":   "Some Anime OST",
+		"Plain Title":                     "Plain Title",
+	} {
+		if got := albumFromTitle(in); got != want {
+			t.Errorf("albumFromTitle(%q) = %q, want %q", in, got, want)
+		}
 	}
 }

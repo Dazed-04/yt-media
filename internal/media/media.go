@@ -121,7 +121,7 @@ func WriteTags(ctx context.Context, path string, tags map[string]string) error {
 
 	switch strings.ToLower(ext) {
 	case ".opus", ".ogg":
-		err = writeOggTags(ctx, path, tmp.Name(), tags)
+		err = writeOggTags(ctx, path, tmp.Name(), tags, "")
 	default:
 		err = writeTagsCopy(ctx, path, tmp.Name(), tags)
 	}
@@ -161,7 +161,7 @@ func runFFmpeg(ctx context.Context, args []string) error {
 // METADATA_BLOCK_PICTURE comment) as a video stream but cannot write one back
 // into an Ogg file, so the cover is taken out, the audio and tags are
 // rewritten, and the cover goes back in as a comment.
-func writeOggTags(ctx context.Context, in, out string, tags map[string]string) error {
+func writeOggTags(ctx context.Context, in, out string, tags map[string]string, cover string) error {
 	info, err := Probe(ctx, in)
 	if err != nil {
 		return err
@@ -175,8 +175,11 @@ func writeOggTags(ctx context.Context, in, out string, tags map[string]string) e
 	for k, v := range tags {
 		meta[strings.ToLower(k)] = v
 	}
-	if pic := extractCover(ctx, in); pic != "" {
-		meta["metadata_block_picture"] = pic
+	if cover == "" {
+		cover = extractCover(ctx, in)
+	}
+	if cover != "" {
+		meta["metadata_block_picture"] = cover
 	}
 
 	f, err := os.CreateTemp(filepath.Dir(out), ".meta-*.txt")

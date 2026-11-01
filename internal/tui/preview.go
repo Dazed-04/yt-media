@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
+
 	"yt-downloader/internal/config"
 	"yt-downloader/internal/downloader"
 
@@ -21,12 +23,19 @@ func thumbCacheDir() string {
 	return filepath.Join(config.CacheDir(), "thumbs")
 }
 
+// thumbName makes an id safe as a file name: other sites' ids can hold
+// slashes and the like. YouTube ids pass through unchanged.
+var thumbNameRe = regexp.MustCompile(`[^A-Za-z0-9_-]`)
+
 func thumbCachePath(id string) string {
-	return filepath.Join(thumbCacheDir(), id+".jpg")
+	return filepath.Join(thumbCacheDir(), thumbNameRe.ReplaceAllString(id, "_")+".jpg")
 }
 
 // thumbURL picks the best-looking thumbnail URL for v.
 func thumbURL(v downloader.Video) string {
+	if !v.IsYouTube() {
+		return v.Thumbnail // other sites: whatever they gave, as it is
+	}
 	url := v.Thumbnail
 	if url == "" {
 		return "https://i.ytimg.com/vi/" + v.ID + "/maxresdefault.jpg"
@@ -99,7 +108,9 @@ func fetchOneThumbnail(videos []downloader.Video, idx, gen int) tea.Cmd {
 		start := time.Now()
 		if err := downloadThumbnailTo(thumbURL(v), dest); err != nil {
 			// fall back to a URL guaranteed to exist
-			_ = downloadThumbnailTo("https://i.ytimg.com/vi/"+v.ID+"/hqdefault.jpg", dest)
+			if v.IsYouTube() {
+				_ = downloadThumbnailTo("https://i.ytimg.com/vi/"+v.ID+"/hqdefault.jpg", dest)
+			}
 		}
 		log.Printf("[THUMB] prefetch #%d %s: downloaded in %s", idx, v.ID, time.Since(start).Round(time.Millisecond))
 		return thumbnailReadyMsg{videoID: v.ID, gen: gen}

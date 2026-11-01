@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
 	"yt-downloader/internal/album"
 	"yt-downloader/internal/config"
 	"yt-downloader/internal/downloader"
@@ -62,6 +63,8 @@ type downloadParams struct {
 	fetchLyrics bool
 	fetchAlbum  bool
 	lyrics      lyrics.Options
+
+	chaptersFile string // yt-dlp writes the video's chapters here (split_chapters)
 }
 
 func (m *Model) downloadItem(jobIndex int) tea.Cmd {
@@ -195,12 +198,15 @@ func (p downloadParams) args(dir, pathFile string) []string {
 	if pathFile != "" {
 		args = append(args, "--print-to-file", "after_move:filepath", pathFile)
 	}
+	if p.chaptersFile != "" {
+		args = append(args, "--print-to-file", "after_move:%(chapters)j", p.chaptersFile)
+	}
 	return append(args,
 		"--embed-metadata", "--embed-thumbnail",
 		"--newline",
 		"--download-archive", p.archive,
 		"--",
-		"https://www.youtube.com/watch?v="+p.req.Video.ID,
+		p.req.Video.URL(),
 	)
 }
 
@@ -217,11 +223,18 @@ func (p downloadParams) run() downloadFinishedMsg {
 	}
 
 	var pathFile string
-	if p.wantsLyrics() || p.wantsAlbum() {
+	if p.wantsLyrics() || p.wantsAlbum() || p.wantsSplit() {
 		if f, err := os.CreateTemp("", "yt-media-path-*.txt"); err == nil {
 			pathFile = f.Name()
 			f.Close()
 			defer os.Remove(pathFile)
+		}
+	}
+	if p.wantsSplit() {
+		if f, err := os.CreateTemp("", "yt-media-chapters-*.json"); err == nil {
+			p.chaptersFile = f.Name()
+			f.Close()
+			defer os.Remove(p.chaptersFile)
 		}
 	}
 	args := p.args(dir, pathFile)
@@ -281,6 +294,11 @@ func (p downloadParams) postProcess(pathFile, albumName string) (missing bool) {
 	if media == "" {
 		log.Printf("[POST] yt-dlp didn't report the output file for %s", p.req.Video.ID)
 		return false
+	}
+	if p.wantsSplit() && p.chaptersFile != "" {
+		if tracks, ok := p.splitIntoTracks(media, albumName); ok {
+			return p.lyricsForSplit(tracks)
+		}
 	}
 	track := trackFromVideo(p.req.Video)
 

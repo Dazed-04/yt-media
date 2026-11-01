@@ -23,6 +23,12 @@ func extractYoutubeID(s string) (string, bool) {
 	return "", false
 }
 
+// isWebLink reports whether s is a single http(s) link (so not a search).
+func isWebLink(s string) bool {
+	s = strings.TrimSpace(s)
+	return (strings.HasPrefix(s, "http://") || strings.HasPrefix(s, "https://")) && !strings.ContainsAny(s, " \t\n")
+}
+
 // doSearch searches YouTube for the query, or fetches a single video when the
 // query is a link. The query and limit are copied first: the command runs on
 // another goroutine while the user keeps typing.
@@ -46,6 +52,13 @@ func (m *Model) doSearch() tea.Cmd {
 			}
 			return searchResultsMsg([]downloader.Video{v})
 		}
+		if isWebLink(query) { // any other site yt-dlp supports
+			vs, err := downloader.FetchURL(query, maxPlaylistEntries, cookies)
+			if err != nil {
+				return errorMsg(err)
+			}
+			return searchResultsMsg(vs)
+		}
 		results, err := downloader.SearchYoutube(query, limit)
 		if err != nil {
 			return errorMsg(err)
@@ -60,8 +73,9 @@ func (m *Model) onSearchResults(videos []downloader.Video) tea.Cmd {
 	m.purgePreviewCache()
 
 	var results []downloader.Video
-	if _, ok := downloader.PlaylistID(strings.TrimSpace(m.SearchQuery)); ok {
-		results = dedupe(videos) // a playlist is the whole list, whatever its titles say
+	q := strings.TrimSpace(m.SearchQuery)
+	if _, ok := downloader.PlaylistID(q); ok || isWebLink(q) {
+		results = dedupe(videos) // a link is the whole list, whatever its titles say
 	} else {
 		results = filterRelevant(videos, m.SearchQuery)
 	}
@@ -152,7 +166,7 @@ func (m *Model) fetchSizeCmd(v downloader.Video, format string) tea.Cmd {
 			args = append(args, "-f", opts.VideoSelector())
 		}
 		args = append(args, opts.CookieArgs()...)
-		args = append(args, v.ID)
+		args = append(args, "--", v.URL())
 
 		sizeStr := "Unknown"
 		if out, err := exec.Command("yt-dlp", args...).Output(); err == nil {

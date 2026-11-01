@@ -15,6 +15,7 @@ type DownloadOptions struct {
 	CookiesFromBrowser string `json:"cookies_from_browser"` // "" or e.g. "firefox", "chrome:Profile 1"
 	SponsorblockRemove string `json:"sponsorblock_remove"`  // "" or categories, e.g. "music_offtopic"
 	PreviewPlayer      string `json:"preview_player"`       // program used by the p key; default mpv
+	SplitChapters      bool   `json:"split_chapters"`
 
 	// Preview tuning. All optional: they exist so a change in YouTube or
 	// yt-dlp can be worked around by editing config.json, not rebuilding.

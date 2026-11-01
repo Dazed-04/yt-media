@@ -194,3 +194,15 @@ func readFile(t *testing.T, p string) string {
 	t.Fatalf("%s never written", p)
 	return ""
 }
+
+func TestPreviewUsesTheItemsOwnLink(t *testing.T) {
+	dir := t.TempDir()
+	argsFile := filepath.Join(dir, "yt")
+	fakeTools(t, `echo "$@" > `+argsFile+`; echo "ERROR: stop here" >&2; exit 1`, "sleep 1")
+	if err := openVideoPreview(config.DefaultDownloadOptions(), "https://artist.bandcamp.com/track/song"); err == nil {
+		t.Error("the fake yt-dlp fails, so an error is expected")
+	}
+	if got := readFile(t, argsFile); !strings.Contains(got, "https://artist.bandcamp.com/track/song") || strings.Contains(got, "youtube.com") {
+		t.Errorf("yt-dlp args = %q", got)
+	}
+}
