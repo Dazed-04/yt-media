@@ -36,6 +36,7 @@ func (m *Model) doSearch() tea.Cmd {
 	query := strings.TrimSpace(m.SearchQuery)
 	limit := m.Config.SearchResultLimit
 	cookies := m.Config.CookieArgs()
+	source := m.SearchSource
 
 	return func() tea.Msg {
 		if id, ok := downloader.PlaylistID(query); ok {
@@ -59,7 +60,7 @@ func (m *Model) doSearch() tea.Cmd {
 			}
 			return searchResultsMsg(vs)
 		}
-		results, err := downloader.SearchYoutube(query, limit)
+		results, err := downloader.Search(source, query, limit)
 		if err != nil {
 			return errorMsg(err)
 		}
@@ -77,7 +78,7 @@ func (m *Model) onSearchResults(videos []downloader.Video) tea.Cmd {
 	if _, ok := downloader.PlaylistID(q); ok || isWebLink(q) {
 		results = dedupe(videos) // a link is the whole list, whatever its titles say
 	} else {
-		results = filterRelevant(videos, m.SearchQuery)
+		results = m.filterResults(videos, m.SearchQuery)
 	}
 	m.MusicList = results
 	m.FilteredList = results

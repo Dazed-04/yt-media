@@ -50,6 +50,8 @@ func (m *Model) View() tea.View {
 func (m *Model) withOverlay(content string) string {
 	box := m.renderQueueOverlay()
 	switch {
+	case m.SourceOpen:
+		box = m.renderSourceOverlay()
 	case m.PlayerOpen:
 		box = m.renderPlayerOverlay()
 	case m.ErrorsOpen:
@@ -81,7 +83,7 @@ func (m *Model) renderSearchBar() string {
 	} else if m.Searching {
 		label = " INSERT "
 	}
-	badge := lipgloss.NewStyle().Foreground(colCrust).Background(colBlue).Bold(true).Render(label)
+	badge := lipgloss.NewStyle().Foreground(colCrust).Background(colBlue).Bold(true).Render(m.sourceBadge(label))
 
 	return lipgloss.NewStyle().
 		Width(m.Width-4).
@@ -102,7 +104,7 @@ func (m *Model) renderArt(lay layout) string {
 	switch {
 	case m.IsFetching && len(m.FilteredList) == 0:
 		spin := lipgloss.NewStyle().Foreground(colMauve).Render(spinnerFrames[m.SpinnerIdx%len(spinnerFrames)])
-		image = lipgloss.Place(lay.cols, lay.artRows, lipgloss.Center, lipgloss.Center, spin+" Fetching YouTube Data...")
+		image = lipgloss.Place(lay.cols, lay.artRows, lipgloss.Center, lipgloss.Center, spin+" "+m.fetchText())
 	case hasCur:
 		if pv, ok := m.previewCache[cur.ID]; ok {
 			image = pv.data
@@ -315,8 +317,8 @@ func (m *Model) renderProgress() string {
 // ---------- 5. footer ----------
 
 func (m *Model) renderFooter() string {
-	text := fmt.Sprintf("(esc: reset • /: search • tab: default %s • space: queue • w: queue [%d] • e: errors [%d] • p: preview • a: queue all • enter: download • r: retry)",
-		m.ChoiceType, len(m.Queue), len(m.Failed))
+	text := fmt.Sprintf("(esc: reset • /: search • tab: default %s • s: source [%s] • space: queue • w: queue [%d] • e: errors [%d] • p: preview • a: queue all • enter: download • r: retry)",
+		m.ChoiceType, m.sourceName(), len(m.Queue), len(m.Failed))
 	color := colDim
 
 	if m.Flash != "" {

@@ -16,6 +16,7 @@ type DownloadOptions struct {
 	SponsorblockRemove string `json:"sponsorblock_remove"`  // "" or categories, e.g. "music_offtopic"
 	PreviewPlayer      string `json:"preview_player"`       // program used by the p key; default mpv
 	SplitChapters      bool   `json:"split_chapters"`
+	SearchSource       string `json:"search_source"`
 
 	// Preview tuning. All optional: they exist so a change in YouTube or
 	// yt-dlp can be worked around by editing config.json, not rebuilding.
@@ -165,4 +166,12 @@ const previewWaitBase = 5 * time.Second
 func (o DownloadOptions) PreviewWait() time.Duration {
 	extra := max(o.PreviewWaitSeconds, 0)
 	return min(previewWaitBase+time.Duration(extra)*time.Second, 5*time.Minute)
+}
+
+// SearchSourceOrDefault is search_source, or "youtube" when blank or unknown.
+func (o DownloadOptions) SearchSourceOrDefault() string {
+	if s := strings.ToLower(strings.TrimSpace(o.SearchSource)); s == "soundcloud" {
+		return s
+	}
+	return "youtube"
 }

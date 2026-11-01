@@ -82,3 +82,27 @@ func TestFetchURLReportsAnUnsupportedLink(t *testing.T) {
 		t.Errorf("err = %v", err)
 	}
 }
+
+func TestSearchSoundcloudAsksForTheRightPrefix(t *testing.T) {
+	dir := t.TempDir()
+	log := filepath.Join(dir, "args")
+	script := "#!/bin/sh\nprintf '%s\\n' \"$@\" > " + log + "\n" +
+		"echo '{\"id\":\"1\",\"title\":\"Song\",\"uploader\":\"Artist\",\"duration\":200,\"url\":\"https://soundcloud.com/artist/song\"}'\n" +
+		"echo '{\"id\":\"2\",\"title\":\"No link\"}'\n"
+	if err := os.WriteFile(filepath.Join(dir, "yt-dlp"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	vs, err := Search("soundcloud", "hollow knight; --exec rm", 7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(vs) != 1 || vs[0].URL() != "https://soundcloud.com/artist/song" || vs[0].Duration != "3:20" || vs[0].Artist != "Artist" {
+		t.Errorf("results = %+v (an entry with no link of its own must be left out)", vs)
+	}
+	b, _ := os.ReadFile(log)
+	args := strings.Split(strings.TrimSpace(string(b)), "\n")
+	if n := len(args); args[n-2] != "--" || args[n-1] != "scsearch7:hollow knight; --exec rm" {
+		t.Errorf("the query must come last, after --: %v", args)
+	}
+}

@@ -53,6 +53,11 @@ type Model struct {
 	ErrorCursor   int
 	ErrorExpanded bool
 
+	// Where typed searches go (s opens the picker)
+	SearchSource string
+	SourceOpen   bool
+	SourceCursor int
+
 	// Audio preview (p): a hidden mpv shown as a small player window
 	Player      *player.Session
 	PlayerOpen  bool
@@ -109,6 +114,7 @@ func InitialModel(cfg config.Config) *Model {
 		MaxWorkers:      max(cfg.MaxWorkers, 1),
 		DownloadState:   StatusIdle,
 		fontShrinkDelta: cfg.FontShrinkDelta,
+		SearchSource:    cfg.SearchSourceOrDefault(),
 	}
 }
 

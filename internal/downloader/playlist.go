@@ -154,6 +154,9 @@ func parseGeneric(out, link string) []Video {
 		if page == "" {
 			page = link
 		}
+		if page == "" {
+			continue // a search hit with no link of its own can't be played or downloaded
+		}
 		id := e.ID
 		if id == "" {
 			sum := sha1.Sum([]byte(page))
@@ -187,4 +190,22 @@ func firstNonBlank(vals ...string) string {
 		}
 	}
 	return ""
+}
+
+// SearchSoundcloud searches SoundCloud for query.
+func SearchSoundcloud(query string, limit int) ([]Video, error) {
+	args := []string{"--dump-json", "--flat-playlist", "--skip-download", "--", fmt.Sprintf("scsearch%d:%s", max(limit, 1), query)}
+	out, err := exec.Command("yt-dlp", args...).Output()
+	if err != nil {
+		return nil, cmdError(err)
+	}
+	return parseGeneric(string(out), ""), nil
+}
+
+// Search searches the given source: "soundcloud", or YouTube for anything else.
+func Search(source, query string, limit int) ([]Video, error) {
+	if source == "soundcloud" {
+		return SearchSoundcloud(query, limit)
+	}
+	return SearchYoutube(query, limit)
 }

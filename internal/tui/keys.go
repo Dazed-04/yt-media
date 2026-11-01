@@ -14,6 +14,8 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.quit()
 	}
 	switch {
+	case m.SourceOpen:
+		return m.handleSourceKey(msg)
 	case m.PlayerOpen:
 		return m.handlePlayerKey(msg)
 	case m.ErrorsOpen:
@@ -51,6 +53,9 @@ func (m *Model) handleSearchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 	case "space":
 		m.SearchQuery += " "
+	case "ctrl+s":
+		m.showSources()
+		return m, nil
 	default:
 		if len(msg.String()) == 1 {
 			m.SearchQuery += msg.String()
@@ -94,6 +99,9 @@ func (m *Model) handleBrowseKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	case "e":
 		m.showErrors()
+
+	case "s":
+		m.showSources()
 
 	case "r":
 		return m, m.retryFailed()

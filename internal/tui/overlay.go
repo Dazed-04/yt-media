@@ -14,7 +14,7 @@ import (
 // ---------- state ----------
 
 func (m *Model) overlayOpen() bool {
-	return m.QueueOpen || m.ErrorsOpen || m.PlayerOpen
+	return m.QueueOpen || m.ErrorsOpen || m.PlayerOpen || m.SourceOpen
 }
 
 func (m *Model) showQueue() {

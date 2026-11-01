@@ -172,7 +172,12 @@ const defaultTemplate = `{
   // comma-separated, e.g. "music_offtopic" or "sponsor,intro,outro".
   // Blank = off.
   "sponsorblock_remove": "",
-  
+ 
+  // Where searches go: "youtube" (default) or "soundcloud". Press s in the
+  // results view (ctrl+s while typing) to switch for the current session.
+  // Pasted links work for any site yt-dlp supports, whatever this says.
+  "search_source": "youtube",
+
 	// Audio only: cut a long upload (an album or soundtrack in one video) into
   // one file per chapter, filed under Artist/Album and tagged with each
   // chapter's title and number. Videos without chapters are left as one file.
