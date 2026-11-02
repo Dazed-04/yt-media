@@ -1,6 +1,6 @@
 # yt-media
 
-A terminal UI wrapper around [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) for downloading audio or video from YouTube without ever leaving the terminal or pasting the same link into a browser tab. Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) and [Lip Gloss](https://github.com/charmbracelet/lipgloss).
+A terminal UI wrapper around [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) for downloading audio or video from YouTube, SoundCloud and any other site yt-dlp supports, without ever leaving the terminal or pasting the same link into a browser tab. Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) and [Lip Gloss](https://github.com/charmbracelet/lipgloss).
 
 Search by name, paste a raw video URL, preview the thumbnail in full quality (on [Kitty](https://sw.kovidgoyal.net/kitty/)), queue up as many results as you like, and download them concurrently — organized into your Music/Videos folders automatically.
 
@@ -12,7 +12,7 @@ Search by name, paste a raw video URL, preview the thumbnail in full quality (on
 
 ## Features
 
-- **Search or paste** — type a query to search YouTube, or paste a full video URL directly and it's fetched as a single item instead of a search. Paste a playlist link and its tracks are loaded as the result list; `a` queues them all.
+- **Search or paste** — type a query to search YouTube or SoundCloud (`s` switches), or paste a link from any site yt-dlp supports (YouTube, SoundCloud, Bandcamp, …). A single link is fetched as one item; a playlist, set or album link loads its tracks as the result list, and `a` queues them all. See [Other sites](#other-sites-and-search-sources).
 - **Preview before downloading** — press `p` to listen to the highlighted track in a small in-app player (audio mode) or watch it in an `mpv` window (video mode). See [Preview](#preview).
 - **Real image previews** — thumbnails render as actual high-resolution images via the Kitty graphics protocol, with an ANSI half-block fallback for other terminals.
 - **Download queue** — stage items with `space`, then review and start them from a floating queue window (`w`). Each item keeps its own Audio/Video type, and the queue survives restarts.
@@ -21,6 +21,7 @@ Search by name, paste a raw video URL, preview the thumbnail in full quality (on
 - **Skip what you already have** — downloads are tracked in a yt-dlp archive file by video ID, so re-running a search you've already downloaded from won't re-fetch anything.
 - **Desktop notifications** — get notified when a _batch_ finishes. Only for batches above a configurable size, and (by default) only when the terminal isn't focused.
 - **Synced lyrics** — after each audio download, matching lyrics are fetched from [LRCLIB](https://lrclib.net) and saved as `.lrc` files for players like `rmpc`/`mpd` clients. A single command fetches them for your whole existing library. See [Lyrics](#lyrics).
+- **Chapter splitting** — turn an album or soundtrack uploaded as one long video into separate, tagged tracks, each looked up for lyrics on its own. Off by default. See [Chapter splitting](#chapter-splitting).
 - **Formats and options** — choose the audio format (mp3, opus, flac, m4a), cap video resolution, remove sponsor segments from music, and use your browser's cookies for age-restricted or rate-limited videos. See [Configuration](#configuration).
 - **Readable errors** — "Network unavailable" instead of `exit status 1`; the full output is always in `~/.cache/yt-media/debug.log`.
 - **Config file, not recompiling** — worker count, default download type, output folders, notification behavior, and more all live in one JSON file.
@@ -33,6 +34,7 @@ Search by name, paste a raw video URL, preview the thumbnail in full quality (on
 - [Kitty terminal](https://sw.kovidgoyal.net/kitty/) for high-resolution thumbnail previews. Other terminals get an ANSI fallback, but Kitty is what this is built and tested on.
 - Optional: [`mpv`](https://mpv.io/) for the `p` preview (`yt-dlp` finds the stream, so both must be installed)
 - Optional: `python-mutagen` (Arch; `pip install mutagen` elsewhere) if you pick `opus` or `flac`, so yt-dlp can embed cover art in those formats
+- Optional: `python-curl-cffi` (Arch; `pip install curl_cffi` elsewhere) — some sites, such as Bandcamp, need yt-dlp to impersonate a browser
 - Optional: `notify-send` (Linux) or `osascript` (macOS, built-in) for batch-completion notifications
 - For macOS: brew install mpv yt-dlp ffmpeg (optional: kitty, for high quality image rendering)
 
@@ -52,10 +54,20 @@ Move the binary somewhere on your `PATH` (e.g. `~/.local/bin`) to launch it from
 
 ## Usage
 
-1. Press `/` and type a search, or paste a YouTube link. Press `enter`.
+1. Press `/` and type a search, or paste a link (YouTube or any other site yt-dlp supports). Press `enter`. Press `s` first (or `ctrl+s` while typing) to search SoundCloud instead of YouTube.
 2. Move through the results with `↑`/`↓` (or `j`/`k`). The info box shows the title, artist, channel, size and duration.
 3. Press `space` to add the highlighted item to the queue, or `a` to queue every listed result. Use `tab` to switch the default type between Audio and Video. Press `p` to preview the highlighted item first.
 4. Press `w` to open the queue, then `enter` to download everything in it. To grab just one item, press `enter` on it in the result list.
+
+## Other sites and search sources
+
+Paste any link yt-dlp supports and it works like a YouTube one: preview, queue, download, tagging and lyrics all use the item's own link. A playlist, SoundCloud set or Bandcamp album link loads as a list (up to 200 entries).
+
+Typed searches go to YouTube or SoundCloud. Press `s` (or `ctrl+s` while typing) to open the **Search on** window and pick one; the search bar then shows the source (for example `INSERT · SoundCloud`), and `search_source` in the config sets the default. Only sites yt-dlp can search are offered, which is why Bandcamp and others work by link only.
+
+- SoundCloud results keep SoundCloud's own ranking and aren't matched against your words (titles often leave out the artist); repeats and snippets under 45 seconds are dropped.
+- SoundCloud has no album for a single track, so albums come from MusicBrainz when it knows the song, otherwise `Unknown Album`.
+- Some sites need yt-dlp to impersonate a browser, which requires `curl_cffi` (see [Requirements](#requirements) and [Troubleshooting](#troubleshooting)).
 
 ## Configuration
 
@@ -132,6 +144,17 @@ On first run, a default config is written to:
   // Blank = off.
   "sponsorblock_remove": "",
 
+  // Where searches go: "youtube" (default) or "soundcloud". Press s in the
+  // results view (ctrl+s while typing) to switch for the current session.
+  // Pasted links work for any site yt-dlp supports, whatever this says.
+  "search_source": "youtube",
+
+  // Audio only: cut a long upload (an album or soundtrack in one video) into
+  // one file per chapter, filed under Artist/Album and tagged with each
+  // chapter's title and number. Videos without chapters are left as one file.
+  // Each piece is looked up for lyrics as its own song.
+  "split_chapters": false,
+
   // The program used for previews.
   "preview_player": "mpv",
 
@@ -179,8 +202,8 @@ On first run, a default config is written to:
 ```
 
 Full-line `//` comments are allowed. Edit the file and restart — no rebuild required.
-A config you already have is never rewritten, so new options won’t appear in it.
-Copy them from the block above.
+
+A config you already have is never rewritten, so new options won't appear in it. Copy them from the block above.
 
 ### Higher-resolution previews via Kitty font shrinking (optional)
 
@@ -260,6 +283,22 @@ If you use `rmpc`, point its lyrics directory at the same `lyrics_dir`.
 
 Audio is filed as `music_dir/Artist/Album/Song.mp3`; videos as `video_dir/Artist/Song.ext`. The artist is the first credited artist, so "A, B & C" and "A" share a folder. The album comes from YouTube when it has one, otherwise from MusicBrainz (see below); songs whose album can't be found go to `Unknown Album`. Songs already in your library are never moved.
 
+## Chapter splitting
+
+Many soundtracks and albums are uploaded as one long video with chapters. With `split_chapters` on, an **audio** download of such a video is cut into one file per chapter:
+
+```
+~/Music/Composer/Game OST/01 - Opening.mp3
+~/Music/Composer/Game OST/02 - Boss Battle.mp3
+```
+
+- Chapters come from yt-dlp. The file is cut with ffmpeg without re-encoding (FLAC is re-encoded losslessly), and the original long file is removed.
+- Each piece is tagged with its chapter title, track number, artist and album, and keeps the cover art. A leading number or timestamp in a chapter title is dropped.
+- The album is the one YouTube or MusicBrainz found, otherwise the video's title without decoration such as `(Full Album)`.
+- Each piece is its own song for lyrics: lyrics are looked up per track, by the chapter's title and length.
+- A video with fewer than two chapters, or a cut that fails, stays as one file; the reason is in `~/.cache/yt-media/debug.log`.
+- It is decided after each download, so it works for playlist items and links too, and does nothing for videos.
+
 ## Album names
 
 YouTube usually doesn't know which album a song is on, so players show "Unknown Album". With `fetch_album` on (the default), after each audio download the album is looked up on [MusicBrainz](https://musicbrainz.org) and written into the file's tags. Only files with **no** album tag are touched, and cover art and other tags are kept.
@@ -268,26 +307,28 @@ YouTube usually doesn't know which album a song is on, so players show "Unknown 
 - Songs MusicBrainz doesn't know stay untagged, and are filed under `Unknown Album`.
 - Both LRCLIB and MusicBrainz limit how fast they can be asked. Requests are spaced out, "429/503 - slow down" answers are waited out (honouring `Retry-After`) and retried, and a scan stops with a clear message if a service keeps refusing; just run it again later, finished songs are skipped.
 - For songs you already have, run `yt-media album` (about one song per second, MusicBrainz's limit). If you use `mpd`, update its database afterwards (`mpc update`).
-- Paths under album_exclude or music_exclude are skipped.
+- Paths under `album_exclude` or `music_exclude` are skipped.
+- Sites other than YouTube rarely carry an album either (SoundCloud tracks have none), so those songs depend on MusicBrainz too.
 
 ## Keybindings
 
 ### Search and results
 
-| Key              | Action                                                               |
-| ---------------- | -------------------------------------------------------------------- |
-| `/`              | Start a search (type a query, or paste a YouTube URL)                |
-| `enter`          | Run the search while typing; otherwise download the highlighted item |
-| `↑`/`k`, `↓`/`j` | Move selection (wraps around the list)                               |
-| `space`          | Add/remove the highlighted item in the queue                         |
-| `a`              | Queue every listed result that isn't already queued                  |
-| `p`              | Preview the highlighted item (see [Preview](#preview))               |
-| `tab`            | Toggle default download type (Audio/Video)                           |
-| `w`              | Open the download queue window                                       |
-| `e`              | Open the error window                                                |
-| `r`              | Retry all failed downloads                                           |
-| `esc`            | Reset search/results                                                 |
-| `q` / `ctrl+c`   | Quit                                                                 |
+| Key              | Action                                                                 |
+| ---------------- | ---------------------------------------------------------------------- |
+| `/`              | Start a search (type a query, or paste a link from any supported site) |
+| `enter`          | Run the search while typing; otherwise download the highlighted item   |
+| `↑`/`k`, `↓`/`j` | Move selection (wraps around the list)                                 |
+| `space`          | Add/remove the highlighted item in the queue                           |
+| `a`              | Queue every listed result that isn't already queued                    |
+| `p`              | Preview the highlighted item (see [Preview](#preview))                 |
+| `s`              | Choose where searches go (YouTube / SoundCloud); `ctrl+s` while typing |
+| `tab`            | Toggle default download type (Audio/Video)                             |
+| `w`              | Open the download queue window                                         |
+| `e`              | Open the error window                                                  |
+| `r`              | Retry all failed downloads                                             |
+| `esc`            | Reset search/results                                                   |
+| `q` / `ctrl+c`   | Quit                                                                   |
 
 ### Player window (`p`, audio mode)
 
@@ -298,6 +339,14 @@ YouTube usually doesn't know which album a song is on, so players show "Unknown 
 | `H`, `L`          | Seek 30 seconds back / forward |
 | `↑`/`k`, `↓`/`j`  | Volume up / down               |
 | `esc` / `q` / `p` | Close and stop playback        |
+
+### Search source window (`s`)
+
+| Key               | Action                      |
+| ----------------- | --------------------------- |
+| `↑`/`k`, `↓`/`j`  | Move                        |
+| `enter`           | Search on the selected site |
+| `esc` / `q` / `s` | Close                       |
 
 ### Queue window (`w`)
 
@@ -328,7 +377,7 @@ The list shows failed items first, then queued items, under a single cursor.
 
 ## How it works
 
-- Searches go through `yt-dlp --dump-json --flat-playlist ytsearch<N>:<query>`; pasted video URLs skip straight to a single-item metadata fetch, and playlist URLs are listed with `--flat-playlist` (up to 200 entries).
+- Searches go through `yt-dlp --dump-json --flat-playlist ytsearch<N>:<query>` (or `scsearch<N>:` for SoundCloud); a pasted link is listed with `--flat-playlist` (a single video gives one item, a playlist, set or album up to 200).
 - Thumbnails are cached locally (`~/.cache/yt-media/thumbs`) during a session and cleared on exit.
 - Downloads run through `yt-dlp` directly — audio is extracted to your chosen `audio_format` (MP3 by default), video keeps the best available audio+video streams (up to `max_video_height`) — with metadata and thumbnails embedded automatically.
 - yt-dlp reports where each file ended up (`--print-to-file after_move:filepath`), which is how lyrics are attached to the right file.
@@ -343,6 +392,8 @@ The list shows failed items first, then queued items, under a single cursor.
 - **Preview says `mpv not found`** — install `mpv` (it needs `yt-dlp` too), or set `preview_player` to another mpv-compatible program.
 - **Preview fails with `HTTP error 403` or `the stream was still refused`** — YouTube refuses stream URLs for the first few seconds. Raise `preview_wait_seconds`, set `preview_mode` to `"auto"` or `"download"`, or try a different `preview_client`.
 - **Preview fails right away** — update `yt-dlp` and `mpv`, then check `~/.cache/yt-media/debug.log` for the real message.
+- **A link fails with `impersonation` / `no impersonate target is available`** (Bandcamp, for example) — install `curl_cffi` (`sudo pacman -S python-curl-cffi` on Arch, `pip install curl_cffi` elsewhere) for the Python that runs yt-dlp, then check `yt-dlp --list-impersonate-targets`.
+- **A link says `Unsupported URL`** — yt-dlp doesn't support that site; check `yt-dlp --list-extractors`.
 - **YouTube asks you to sign in / age-restricted video** — set `cookies_from_browser` to a browser you're logged into, e.g. `"firefox"`.
 - **Anything else** — open the error window (`e`) and press `enter` for the full yt-dlp output. Everything is also logged to `~/.cache/yt-media/debug.log` (run `yt-media paths` to see it).
 
