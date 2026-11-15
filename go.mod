@@ -1,10 +1,10 @@
 module yt-downloader
 
-go 1.26.2
+go 1.26.7
 
 require (
 	charm.land/bubbletea/v2 v2.1.1
-	charm.land/lipgloss/v2 v2.0.6
+	charm.land/lipgloss/v2 v2.1.0
 	golang.org/x/image v0.47.0
 )
 
