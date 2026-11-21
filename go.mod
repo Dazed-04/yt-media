@@ -4,7 +4,7 @@ go 1.26.7
 
 require (
 	charm.land/bubbletea/v2 v2.1.1
-	charm.land/lipgloss/v2 v2.1.0
+	charm.land/lipgloss/v2 v2.1.1
 	golang.org/x/image v0.48.0
 )
 
